@@ -10,7 +10,8 @@ The implementation aims to preserve and extend the behavior of the original code
 * Latin orthography → Atomic conversion
 * Atomic → NahuatlOne abugida conversion
 * Trager abugida → Atomic conversion
-* NOCE-compatible Atomic orthography processing
+* NOCE-inspired output forms through the `convert_all()` library API: Trager, ACK, SEP, Hasler, Atomic, allophones, direct IPA, phonetic IPA, and search
+* Name, place, deity, and immutable-word metadata in `convert_text()`
 * Classical Nahuatl → modern SEP orthography converter (`c2m`)
 * Unicode-safe Rust implementation
 * Command-line interface
@@ -35,6 +36,36 @@ Or run the compiled binary:
 ```bash
 ./target/release/nahuatl_transcoder words.txt
 ```
+
+The main command-line program currently converts each input line to the Trager-style NahuatlOne abugida. The library API also exposes several NOCE-inspired output forms:
+
+```rust
+use nahuatl_transcoder::convert_all;
+
+let result = convert_all("kalli");
+println!("{}", result.search);
+```
+
+`convert_all()` returns a `ConversionResult` with these fields:
+
+* `trager`: Trager-style NahuatlOne abugida
+* `ack`, `sep`, `hasler`: Latin-based orthographic forms
+* `atom`: normalized Atomic representation
+* `allo`: M→F allophonic Atomic form
+* `ipa`: direct IPA from the Atomic form
+* `iph`: phonetic IPA, including degemination, syllabification, and stress marking
+* `search`: allophonic form with consonant gemination removed
+
+These outputs are available through the library; the main CLI does not yet provide format selectors or an `all` output mode.
+
+`convert_text()` converts whitespace-separated text to Trager-style output and recognizes metadata tags at the start of a word. The tag constants are available in `metaword`:
+
+* `TAG_PROPER_NAME` (`U+200B`): mark a proper name
+* `TAG_PLACE_NAME` (`U+200C`): mark a place name
+* `TAG_DEITY_NAME` (`U+200D`): mark a deity name
+* `TAG_IMMUTABLE` (`U+200E`): pass the word through unchanged
+
+Name, place, and deity tags select the corresponding Trager prefix; untagged words can also be classified using the built-in name and deity lists and a locative-suffix heuristic. Immutable words pass through unchanged in `convert_text()`. Text is split on whitespace, so original spacing and line breaks are not preserved.
 
 ## c2m
 
@@ -72,28 +103,39 @@ The converter:
 
 The architecture incorporates the Atomic ↔ Trager model introduced in the later NOCE project:
 
-* **Atomic Intermediate Representation:** Derived from the [NOCE](https://github.com/piratical/noce) project, it provides a normalized phonemic representation used internally by the converter for robust orthography handling and internal normalization.
-* **Modules (`abugida.rs`, `atomic.rs`, `orthography.rs`, `trager.rs`):** Handle the decoupled processing of orthographic mapping, phonemic atomization, and abugida rendering.
+* **Atomic Intermediate Representation:** Derived from the [NOCE](https://github.com/piratical/noce) project, it provides a normalized phonemic representation used internally by the converter for orthographic normalization and output generation.
+* **Output forms:** `convert_all()` returns the available orthographies and phonetic/search forms together in a `ConversionResult`. SEP and Hasler use the M→F allophonic form; ACK, Trager, direct IPA, and Atomic use the normalized form.
+* **Phonetic processing:** The library includes M→F allophone rules, consonant degemination, syllabification, penultimate-stress marking, and phonetic IPA generation. F→M recovery and gemination helpers are also available, but are not wired into the main conversion pipeline.
+* **Metadata:** `convert_text()` recognizes the zero-width name, place, deity, and immutable tags and applies Trager prefixes or immutable pass-through. It does not preserve original whitespace or line breaks.
+* **Modules (`abugida.rs`, `allophones.rs`, `atomic.rs`, `geminate.rs`, `metaword.rs`, `orthography.rs`, `phonetics.rs`, `trager.rs`):** Handle abugida rendering, Atomic normalization, metadata, orthographic mapping, and the available phonological transformations.
 
 ## Project layout
 
 ```text
 src/
 ├── abugida.rs
+├── allophones.rs
 ├── atomic.rs
 ├── constants.rs
+├── en_endings.rs
 ├── geminate.rs
 ├── lib.rs
 ├── main.rs
 ├── metaword.rs
 ├── orthography.rs
+├── phonetics.rs
 ├── structure.rs
 ├── trager.rs
-└── bin/
-    └── c2m.rs
+├── bin/
+│   └── c2m.rs
+└── data/
+    ├── deities.txt
+    ├── given_names.txt
+    └── surnames.txt
 
 tests/
-└── golden.rs
+├── golden.rs
+└── metaword.rs
 ```
 
 ## Background
