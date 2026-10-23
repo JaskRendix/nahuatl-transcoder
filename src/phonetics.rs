@@ -1,3 +1,5 @@
+use crate::atomic::{is_atomic_consonant, is_atomic_vowel};
+use crate::orthography::atomic_to_ipa;
 use once_cell::sync::Lazy;
 use regex::Regex;
 
@@ -80,6 +82,92 @@ pub fn apply_m2f(word: &str) -> String {
     k_cons_to_h_cons(&word)
 }
 
+pub fn degeminate(word: &str) -> String {
+    let mut out = String::new();
+    let chars: Vec<char> = word.chars().collect();
+
+    let mut i = 0;
+    while i < chars.len() {
+        out.push(chars[i]);
+
+        if i + 1 < chars.len() && chars[i] == chars[i + 1] && is_atomic_consonant(chars[i]) {
+            i += 2;
+        } else {
+            i += 1;
+        }
+    }
+
+    out
+}
+
+pub fn syllabify(word: &str) -> String {
+    let mut out = String::new();
+    let chars: Vec<char> = word.chars().collect();
+
+    let mut i = 0;
+
+    while i < chars.len() {
+        let current = chars[i];
+
+        let next = chars.get(i + 1).copied();
+        let next2 = chars.get(i + 2).copied();
+
+        let needs_break = (is_atomic_vowel(current)
+            && next.is_some_and(is_atomic_consonant)
+            && next2.is_some_and(is_atomic_vowel))
+            || (is_atomic_consonant(current) && next.is_some_and(is_atomic_consonant))
+            || (is_atomic_vowel(current) && next.is_some_and(is_atomic_vowel));
+
+        out.push(current);
+
+        if needs_break {
+            out.push('·');
+        }
+
+        i += 1;
+    }
+
+    out
+}
+
+pub fn mark_penultimate_stress(s: &str) -> String {
+    let mut positions = Vec::new();
+
+    for (idx, ch) in s.char_indices() {
+        if ch == '·' {
+            positions.push(idx);
+        }
+    }
+
+    if positions.len() >= 2 {
+        let pos = positions[positions.len() - 2];
+
+        let mut result = String::new();
+        result.push_str(&s[..pos]);
+        result.push('ˈ');
+        result.push_str(&s[pos + '·'.len_utf8()..]);
+
+        result
+    } else {
+        format!("ˈ{s}")
+    }
+}
+
+pub fn fix_stress_exceptions(iph: &str) -> String {
+    iph.replace("ˈaʃ·t͡ɬen", "aʃˈt͡ɬen")
+        .replace("ˈjon.se", "jonˈse")
+}
+
+pub fn atomic_to_ipa_phonetic(word: &str) -> String {
+    let degem = degeminate(word);
+    let syllables = syllabify(&degem);
+    let stressed = mark_penultimate_stress(&syllables);
+
+    let ipa = atomic_to_ipa(&stressed);
+
+    fix_stress_exceptions(&ipa)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -127,5 +215,65 @@ mod tests {
     #[test]
     fn apply_m2f_tzin() {
         assert_eq!(apply_m2f("τin"), "τih");
+    }
+
+    #[test]
+    fn degeminate_kalli() {
+        assert_eq!(degeminate("kalli"), "kali");
+    }
+
+    #[test]
+    fn degeminate_itta() {
+        assert_eq!(degeminate("itta"), "ita");
+    }
+
+    #[test]
+    fn degeminate_non_geminate() {
+        assert_eq!(degeminate("kali"), "kali");
+    }
+
+    #[test]
+    fn syllabify_vcv() {
+        assert_eq!(syllabify("kali"), "ka·li");
+    }
+
+    #[test]
+    fn syllabify_cc() {
+        assert_eq!(syllabify("kalli"), "kal·li");
+    }
+
+    #[test]
+    fn syllabify_vv() {
+        assert_eq!(syllabify("toa"), "to·a");
+    }
+
+    #[test]
+    fn stress_two_syllables() {
+        assert_eq!(mark_penultimate_stress("ka·li"), "ˈka·li");
+    }
+
+    #[test]
+    fn stress_three_syllables() {
+        assert_eq!(mark_penultimate_stress("ta·ka·ti"), "taˈka·ti");
+    }
+
+    #[test]
+    fn stress_exception_ashtlen() {
+        assert_eq!(fix_stress_exceptions("ˈaʃ·t͡ɬen"), "aʃˈt͡ɬen");
+    }
+
+    #[test]
+    fn stress_exception_yonse() {
+        assert_eq!(fix_stress_exceptions("ˈjon.se"), "jonˈse");
+    }
+
+    #[test]
+    fn ipa_phonetic_lambda() {
+        assert_eq!(atomic_to_ipa_phonetic("λ"), "ˈt͡ɬ");
+    }
+
+    #[test]
+    fn ipa_phonetic_kalli() {
+        assert_eq!(atomic_to_ipa_phonetic("kalli"), "ˈka·li");
     }
 }
