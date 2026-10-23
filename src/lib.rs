@@ -6,6 +6,7 @@ pub mod en_endings;
 pub mod geminate;
 pub mod metaword;
 pub mod orthography;
+pub mod phonetics;
 pub mod structure;
 pub mod trager;
 
@@ -13,6 +14,7 @@ use abugida::atomic_to_abugida;
 use allophones::*;
 use atomic::to_atomic;
 use metaword::split_to_metawords;
+use phonetics::*;
 use structure::structure;
 
 pub fn convert(input: &str) -> String {
@@ -51,6 +53,15 @@ pub fn apply_f2m(word: &str) -> String {
     let word = h_cons_to_k_cons(&word);
     let word = h2w(&word);
     h2n(&word)
+}
+
+pub fn apply_m2f(word: &str) -> String {
+    let word = ll2hl(word);
+    let word = n2h(&word);
+    let word = w2h(&word);
+    let word = kw2k_or_h(&word);
+
+    k_cons_to_h_cons(&word)
 }
 
 #[cfg(test)]
