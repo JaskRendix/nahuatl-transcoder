@@ -7,6 +7,7 @@ pub mod geminate;
 pub mod metaword;
 pub mod orthography;
 pub mod phonetics;
+pub mod reconstruction;
 pub mod structure;
 pub mod trager;
 
