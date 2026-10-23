@@ -11,6 +11,7 @@ The implementation aims to preserve and extend the behavior of the original code
 * Atomic → NahuatlOne abugida conversion
 * Trager abugida → Atomic conversion
 * NOCE-inspired output forms through the `convert_all()` library API: Trager, ACK, SEP, Hasler, Atomic, allophones, direct IPA, phonetic IPA, and search
+* Ambiguity-preserving SEP → Atomic/ACK reconstruction through `reconstruct_sep()`
 * Name, place, deity, and immutable-word metadata in `convert_text()`
 * Classical Nahuatl → modern SEP orthography converter (`c2m`)
 * Unicode-safe Rust implementation
@@ -57,6 +58,31 @@ println!("{}", result.search);
 * `search`: allophonic form with consonant gemination removed
 
 These outputs are available through the library; the main CLI does not yet provide format selectors or an `all` output mode.
+
+### SEP reconstruction
+
+Conversion and reconstruction serve different purposes. `convert_all()` converts an input into its normalized Atomic form and derived outputs, including a SEP rendering. `reconstruct_sep()` works in the opposite direction: it takes a SEP form and generates plausible underlying Atomic forms, with an ACK rendering for each. Because phonetic SEP can merge distinctions present in ACK, reconstruction can return multiple candidates rather than choosing one underlying form.
+
+```rust
+use nahuatl_transcoder::reconstruction::reconstruct_sep;
+
+let candidates = reconstruct_sep("nosij");
+for candidate in &candidates.candidates {
+    println!("{} -> {}", candidate.atomic, candidate.ack);
+}
+```
+
+For this input, the candidate set includes both `nosih` → `nocih` and `nosin` → `nocin`. The former preserves the observed form; the latter represents a possible underlying final `n`. `Candidate` contains the `atomic` form, its `ack` rendering, and the `derivations` that generated it. `CandidateSet` contains the candidates and a `status` of `NoCandidates`, `Unique`, or `Ambiguous`.
+
+Candidates are hypotheses, not ranked answers. Reconstruction retains distinct candidates, deduplicates identical Atomic forms, and checks that each candidate projects forward to the observed SEP form (allowing the existing degemination equivalence). Implemented recovery derivations cover:
+
+* `FinalNRecovery`: final surface `h` may reflect underlying `n`
+* `CodaWRecovery`: coda surface `h` may reflect underlying `w`
+* `LlHlRecovery`: recovers `ll` in contexts where the forward rule produces `hl`
+* `KLenitionRecovery`: recovers `k` from surface `h` in the documented consonant context
+* `KwRecovery`: recovers underlying `κ` from its coda `k`/`h` outcomes
+
+The `reconstruction_cases.rs` integration tests cover targeted phonological examples and negative controls. `reconstruction_corpus.rs` evaluates round trips over `words.txt` and `golden.csv`, checking projection, deduplication, ACK renderings, and candidate recall. The current fixtures yield **100% synthetic round-trip recall**: for each fixture input, the original Atomic form used to generate its SEP form appears among the reconstructed candidates. This is not a measure of real-world reconstruction accuracy. Both the SEP input and expected Atomic form in this benchmark are produced by this project's own conversion path, and the fixtures are not an independently annotated, representative corpus of attested SEP and underlying forms.
 
 `convert_text()` converts whitespace-separated text to Trager-style output and recognizes metadata tags at the start of a word. The tag constants are available in `metaword`:
 
@@ -105,9 +131,9 @@ The architecture incorporates the Atomic ↔ Trager model introduced in the late
 
 * **Atomic Intermediate Representation:** Derived from the [NOCE](https://github.com/piratical/noce) project, it provides a normalized phonemic representation used internally by the converter for orthographic normalization and output generation.
 * **Output forms:** `convert_all()` returns the available orthographies and phonetic/search forms together in a `ConversionResult`. SEP and Hasler use the M→F allophonic form; ACK, Trager, direct IPA, and Atomic use the normalized form.
-* **Phonetic processing:** The library includes M→F allophone rules, consonant degemination, syllabification, penultimate-stress marking, and phonetic IPA generation. F→M recovery and gemination helpers are also available, but are not wired into the main conversion pipeline.
+* **Phonetic processing:** The library includes M→F allophone rules, consonant degemination, syllabification, penultimate-stress marking, and phonetic IPA generation. F→M recovery and gemination helpers support the separate ambiguity-preserving `reconstruct_sep()` API; they do not change the `convert_all()` conversion pipeline.
 * **Metadata:** `convert_text()` recognizes the zero-width name, place, deity, and immutable tags and applies Trager prefixes or immutable pass-through. It does not preserve original whitespace or line breaks.
-* **Modules (`abugida.rs`, `allophones.rs`, `atomic.rs`, `geminate.rs`, `metaword.rs`, `orthography.rs`, `phonetics.rs`, `trager.rs`):** Handle abugida rendering, Atomic normalization, metadata, orthographic mapping, and the available phonological transformations.
+* **Modules (`abugida.rs`, `allophones.rs`, `atomic.rs`, `geminate.rs`, `metaword.rs`, `orthography.rs`, `phonetics.rs`, `reconstruction.rs`, `trager.rs`):** Handle abugida rendering, Atomic normalization, metadata, orthographic mapping, phonological transformations, and SEP reconstruction.
 
 ## Project layout
 
@@ -124,6 +150,7 @@ src/
 ├── metaword.rs
 ├── orthography.rs
 ├── phonetics.rs
+├── reconstruction.rs
 ├── structure.rs
 ├── trager.rs
 ├── bin/
@@ -135,7 +162,9 @@ src/
 
 tests/
 ├── golden.rs
-└── metaword.rs
+├── metaword.rs
+├── reconstruction_cases.rs
+└── reconstruction_corpus.rs
 ```
 
 ## Background
