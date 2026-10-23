@@ -1,6 +1,7 @@
 pub mod abugida;
 pub mod atomic;
 pub mod constants;
+pub mod geminate;
 pub mod metaword;
 pub mod orthography;
 pub mod structure;
