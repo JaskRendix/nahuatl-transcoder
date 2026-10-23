@@ -62,23 +62,6 @@ fn vowel_to_vowel_sign(ch: char) -> char {
     }
 }
 
-fn exchange_compound_vowels(chars: &mut Vec<char>, pos: usize, vowel_sign: char, vowel: char) {
-    let replacement = match (vowel_sign, vowel) {
-        (VOWEL_SIGN_I, VOWEL_A) => Some(VOWEL_SIGN_IA),
-        (VOWEL_SIGN_A, VOWEL_I) => Some(VOWEL_SIGN_AI),
-        (VOWEL_SIGN_O, VOWEL_A) => Some(VOWEL_SIGN_OA),
-        (VOWEL_SIGN_E, VOWEL_O) => Some(VOWEL_SIGN_EO),
-        (VOWEL_SIGN_E, VOWEL_I) => Some(VOWEL_SIGN_EI),
-        (VOWEL_SIGN_I, VOWEL_O) => Some(VOWEL_SIGN_IO),
-        (VOWEL_SIGN_A, VOWEL_O) => Some(VOWEL_SIGN_AO),
-        _ => None,
-    };
-
-    if let Some(r) = replacement {
-        chars.splice(pos..pos + 2, [r]);
-    }
-}
-
 pub fn structure(input: &str) -> String {
     let mut elem: Vec<char> = input.chars().collect();
 
@@ -136,25 +119,42 @@ pub fn structure(input: &str) -> String {
     }
 
     //
-    // Convert vowel sign + vowel
+    // Convert vowel sign + vowel (with optional long vowel markers)
     // into compound vowel signs
     //
     let mut i = 0;
 
-    while i + 1 < elem.len() {
+    while i < elem.len() {
         let first = elem[i];
-        let second = elem[i + 1];
-
-        if is_vowel_sign(first) && is_vowel(second) {
-            let old_len = elem.len();
-
-            exchange_compound_vowels(&mut elem, i, first, second);
-
-            if elem.len() < old_len {
-                continue;
+        if is_vowel_sign(first) {
+            let mut vowel_pos = i + 1;
+            // skip long marker after first vowel sign
+            if vowel_pos < elem.len() && elem[vowel_pos] == LONG_VOWEL_SIGN {
+                vowel_pos += 1;
+            }
+            if vowel_pos < elem.len() && is_vowel(elem[vowel_pos]) {
+                let vowel = elem[vowel_pos];
+                let replacement = match (first, vowel) {
+                    (VOWEL_SIGN_I, VOWEL_A) => Some(VOWEL_SIGN_IA),
+                    (VOWEL_SIGN_A, VOWEL_I) => Some(VOWEL_SIGN_AI),
+                    (VOWEL_SIGN_O, VOWEL_A) => Some(VOWEL_SIGN_OA),
+                    (VOWEL_SIGN_E, VOWEL_O) => Some(VOWEL_SIGN_EO),
+                    (VOWEL_SIGN_E, VOWEL_I) => Some(VOWEL_SIGN_EI),
+                    (VOWEL_SIGN_I, VOWEL_O) => Some(VOWEL_SIGN_IO),
+                    (VOWEL_SIGN_A, VOWEL_O) => Some(VOWEL_SIGN_AO),
+                    _ => None,
+                };
+                if let Some(compound) = replacement {
+                    let mut end = vowel_pos + 1;
+                    // skip long marker after second vowel
+                    if end < elem.len() && elem[end] == LONG_VOWEL_SIGN {
+                        end += 1;
+                    }
+                    elem.splice(i..end, [compound]);
+                    continue;
+                }
             }
         }
-
         i += 1;
     }
 
