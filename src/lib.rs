@@ -1,6 +1,8 @@
 pub mod abugida;
+pub mod allophones;
 pub mod atomic;
 pub mod constants;
+pub mod en_endings;
 pub mod geminate;
 pub mod metaword;
 pub mod orthography;
@@ -8,6 +10,7 @@ pub mod structure;
 pub mod trager;
 
 use abugida::atomic_to_abugida;
+use allophones::*;
 use atomic::to_atomic;
 use metaword::split_to_metawords;
 use structure::structure;
@@ -41,6 +44,13 @@ pub fn convert_text(input: &str) -> String {
     }
 
     out.trim_end().to_string()
+}
+
+pub fn apply_f2m(word: &str) -> String {
+    let word = hk2wk(word);
+    let word = h_cons_to_k_cons(&word);
+    let word = h2w(&word);
+    h2n(&word)
 }
 
 #[cfg(test)]
@@ -82,5 +92,35 @@ mod tests {
     #[test]
     fn convert_and_convert_text_are_identical_for_plain_words() {
         assert_eq!(convert("kalli"), convert_text("kalli"));
+    }
+
+    #[test]
+    fn apply_f2m_pehki() {
+        assert_eq!(apply_f2m("pehki"), "pewki");
+    }
+
+    #[test]
+    fn apply_f2m_kohkeh() {
+        assert_eq!(apply_f2m("kohkeh"), "kowkeh");
+    }
+
+    #[test]
+    fn apply_f2m_nihneki() {
+        assert_eq!(apply_f2m("nihneki"), "nikneki");
+    }
+
+    #[test]
+    fn apply_f2m_tonatih() {
+        assert_eq!(apply_f2m("tonatih"), "tonatiw");
+    }
+
+    #[test]
+    fn apply_f2m_tzih() {
+        assert_eq!(apply_f2m("τih"), "τin");
+    }
+
+    #[test]
+    fn apply_f2m_michih() {
+        assert_eq!(apply_f2m("miςih"), "miςin");
     }
 }

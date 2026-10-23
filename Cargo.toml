@@ -6,4 +6,5 @@ license = "GPL-2.0-or-later"
 authors = ["Giorgio"]
 
 [dependencies]
+once_cell = "1.21.4"
 regex = "1"
