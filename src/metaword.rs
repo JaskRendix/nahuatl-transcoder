@@ -3,6 +3,11 @@ use crate::atomic::{is_foreign_consonant, to_atomic};
 use std::collections::HashSet;
 use std::sync::OnceLock;
 
+pub const TAG_PROPER_NAME: char = '\u{200B}';
+pub const TAG_PLACE_NAME: char = '\u{200C}';
+pub const TAG_DEITY_NAME: char = '\u{200D}';
+pub const TAG_IMMUTABLE: char = '\u{200E}';
+
 #[derive(Debug, Clone, Default)]
 pub struct MetaWord {
     pub original: String,
@@ -21,7 +26,8 @@ pub struct MetaWord {
     pub is_deity_name: bool,
 }
 
-const PREFIX_PUNCTUATION: &str = "\n\r.,—–‒/#!¡$%^&*;:=-_`~@+?¿(){}<>[]+\"“”«»‘’‛‹›…'";
+const PREFIX_PUNCTUATION: &str =
+    "\u{200B}\u{200C}\u{200D}\u{200E}\n\r.,—–‒/#!¡$%^&*;:=-_`~@+?¿(){}<>[]+\"“”«»‘’‛‹›…'";
 
 const POSTFIX_PUNCTUATION: &str = "\n\r.,—–‒/#!¡$%^&*;:=-_`~@+?¿(){}<>[]+\"“”«»‘’‛‹›…'";
 
@@ -130,7 +136,17 @@ pub fn split_to_metawords(input: &str) -> Vec<MetaWord> {
     let mut result = Vec::new();
 
     for original in input.split_whitespace() {
-        let (prefixed, word, postfixed) = segregate_punctuation(original);
+        let (mut prefixed, word, postfixed) = segregate_punctuation(original);
+
+        let is_immutable = prefixed.contains(TAG_IMMUTABLE);
+
+        let mut proper_name = prefixed.contains(TAG_PROPER_NAME);
+        let mut place_name = prefixed.contains(TAG_PLACE_NAME);
+        let mut deity_name = prefixed.contains(TAG_DEITY_NAME);
+
+        prefixed.retain(|c| {
+            c != TAG_IMMUTABLE && c != TAG_PROPER_NAME && c != TAG_PLACE_NAME && c != TAG_DEITY_NAME
+        });
 
         let atomic = to_atomic(&word.to_lowercase());
 
@@ -140,9 +156,11 @@ pub fn split_to_metawords(input: &str) -> Vec<MetaWord> {
             .map(|c| c.is_uppercase())
             .unwrap_or(false);
 
-        let is_place_name = has_locative_suffix(&atomic);
-        let is_deity_name = is_deity(&atomic);
-        let is_proper_name = is_proper_name(&word);
+        if !proper_name && !place_name && !deity_name {
+            place_name = has_locative_suffix(&atomic);
+            deity_name = is_deity(&atomic);
+            proper_name = is_proper_name(&word);
+        }
 
         result.push(MetaWord {
             original: original.to_string(),
@@ -155,10 +173,10 @@ pub fn split_to_metawords(input: &str) -> Vec<MetaWord> {
 
             flic,
 
-            is_immutable: false,
-            is_proper_name,
-            is_place_name,
-            is_deity_name,
+            is_immutable,
+            is_proper_name: proper_name,
+            is_place_name: place_name,
+            is_deity_name: deity_name,
         });
     }
 

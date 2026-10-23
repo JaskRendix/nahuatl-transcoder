@@ -168,6 +168,10 @@ pub fn atomic_to_ipa_phonetic(word: &str) -> String {
     fix_stress_exceptions(&ipa)
 }
 
+pub fn search_form(word: &str) -> String {
+    degeminate(&apply_m2f(word))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -275,5 +279,15 @@ mod tests {
     #[test]
     fn ipa_phonetic_kalli() {
         assert_eq!(atomic_to_ipa_phonetic("kalli"), "ˈka·li");
+    }
+
+    #[test]
+    fn search_form_nihneki() {
+        assert_eq!(search_form("nikneki"), "nihneki");
+    }
+
+    #[test]
+    fn search_form_kalli() {
+        assert_eq!(search_form("kalli"), "kali");
     }
 }

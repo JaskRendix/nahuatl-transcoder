@@ -31,7 +31,17 @@ pub fn convert_text(input: &str) -> String {
     let mut out = String::new();
 
     for mw in words {
+        if mw.is_immutable {
+            out.push_str(&mw.prefixed);
+            out.push_str(&mw.word);
+            out.push_str(&mw.postfixed);
+            out.push(' ');
+            continue;
+        }
+
         let abugida = structure(&atomic_to_abugida(&mw.atomic));
+
+        out.push_str(&mw.prefixed);
 
         if mw.is_deity_name {
             out.push(constants::nab::PREFIX_DEITY);
@@ -42,6 +52,7 @@ pub fn convert_text(input: &str) -> String {
         }
 
         out.push_str(&abugida);
+        out.push_str(&mw.postfixed);
         out.push(' ');
     }
 
