@@ -14,8 +14,40 @@ use abugida::atomic_to_abugida;
 use allophones::*;
 use atomic::to_atomic;
 use metaword::split_to_metawords;
+use orthography::{atomic_to_ack, atomic_to_hasler, atomic_to_ipa, atomic_to_sep};
 use phonetics::*;
 use structure::structure;
+
+#[derive(Debug, Clone, Default)]
+pub struct ConversionResult {
+    pub trager: String,
+    pub ack: String,
+    pub sep: String,
+    pub hasler: String,
+    pub atom: String,
+    pub allo: String,
+    pub ipa: String,
+    pub iph: String,
+    pub search: String,
+}
+
+pub fn convert_all(input: &str) -> ConversionResult {
+    let atomic = to_atomic(input);
+
+    let allo = apply_m2f(&atomic);
+
+    ConversionResult {
+        trager: structure(&atomic_to_abugida(&atomic)),
+        ack: atomic_to_ack(&atomic),
+        sep: atomic_to_sep(&allo),
+        hasler: atomic_to_hasler(&allo),
+        atom: atomic.clone(),
+        allo: allo.clone(),
+        ipa: atomic_to_ipa(&atomic),
+        iph: atomic_to_ipa_phonetic(&allo),
+        search: search_form(&atomic),
+    }
+}
 
 pub fn convert(input: &str) -> String {
     let atomic = to_atomic(input);
@@ -144,5 +176,15 @@ mod tests {
     #[test]
     fn apply_f2m_michih() {
         assert_eq!(apply_f2m("miςih"), "miςin");
+    }
+
+    #[test]
+    fn convert_all_basic() {
+        let result = convert_all("kalli");
+
+        assert!(!result.trager.is_empty());
+        assert!(!result.atom.is_empty());
+        assert!(!result.ipa.is_empty());
+        assert!(!result.search.is_empty());
     }
 }
