@@ -98,7 +98,7 @@ pub fn structure(input: &str) -> String {
             elem[i + 1] = vowel_to_vowel_sign(second);
 
             if is_consonant(third) && (is_not_abugida(fourth) || is_consonant(fourth)) {
-                elem.insert(i + 2, SUBJOINER);
+                elem.insert(i + 2, SUBJOINER_SIGN);
                 i += 1;
             }
         }
@@ -111,7 +111,7 @@ pub fn structure(input: &str) -> String {
             && is_consonant(second)
             && (is_not_abugida(third) || is_consonant(third))
         {
-            elem.insert(i + 1, SUBJOINER);
+            elem.insert(i + 1, SUBJOINER_SIGN);
             i += 1;
         }
 

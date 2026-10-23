@@ -1,5 +1,3 @@
-// src/orthography.rs
-
 use crate::atomic::{is_atomic_letter, is_atomic_vowel};
 
 fn map_sep(ch: char) -> Option<&'static str> {

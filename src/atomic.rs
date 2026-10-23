@@ -209,7 +209,7 @@ mod tests {
 
     #[test]
     fn trager_is_processed() {
-        let s = format!("{}", crate::trager::nab::CONSONANT_MA);
+        let s = format!("{}", crate::constants::CONSONANT_MA);
         assert_eq!(to_atomic(&s), "ma");
     }
 }
