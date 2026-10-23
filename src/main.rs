@@ -1,14 +1,27 @@
 use std::env;
-use std::fs;
+use std::fs::File;
+use std::io::{BufRead, BufReader};
 
 use nahuatl_transcoder::convert;
 
+fn run() -> Result<(), Box<dyn std::error::Error>> {
+    let filename = env::args()
+        .nth(1)
+        .ok_or("usage: nahuatl_transcoder <file>")?;
+
+    let file = File::open(&filename)?;
+    let reader = BufReader::new(file);
+
+    for line in reader.lines() {
+        println!("{}", convert(&line?));
+    }
+
+    Ok(())
+}
+
 fn main() {
-    let filename = env::args().nth(1).expect("usage: convert <file>");
-
-    let content = fs::read_to_string(filename).expect("cannot read file");
-
-    for line in content.lines() {
-        println!("{}", convert(line));
+    if let Err(err) = run() {
+        eprintln!("nahuatl_transcoder: {err}");
+        std::process::exit(1);
     }
 }
