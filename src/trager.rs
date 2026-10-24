@@ -1,3 +1,4 @@
+use crate::atomic::{is_atomic_consonant, is_atomic_letter, is_atomic_vowel};
 use crate::constants::nab;
 use std::sync::OnceLock;
 
@@ -101,7 +102,20 @@ pub fn get_trager_to_atomic_rules() -> &'static [(String, &'static str)] {
             ));
         }
 
-        // 4. Long Vowel Mappings
+        // 4. Long intrinsic-A vowels on consonant bases
+        //
+        // CONSONANT_MA + LONG_VOWEL_SIGN -> mā
+        // CONSONANT_NA + LONG_VOWEL_SIGN -> nā
+        // etc.
+        //
+        for &(c, base) in &consonants {
+            rules.push((
+                format!("{}{}", c, nab::LONG_VOWEL_SIGN),
+                Box::leak(format!("{}ā", base).into_boxed_str()),
+            ));
+        }
+
+        // 4b. Standalone vowels with long mark
         let vowels = [
             nab::VOWEL_A,
             nab::VOWEL_E,
@@ -178,6 +192,252 @@ pub fn trager_to_atomic(input: &str) -> String {
 
     for (from, to) in rules {
         out = out.replace(from, to);
+    }
+
+    out
+}
+
+fn trager_base(ch: char) -> char {
+    match ch {
+        // vowels
+        'a' => nab::VOWEL_A,
+        'e' => nab::VOWEL_E,
+        'i' => nab::VOWEL_I,
+        'o' => nab::VOWEL_O,
+        'u' => nab::VOWEL_U,
+
+        // long vowels
+        // NOTE: these are handled elsewhere in atomic_to_trager(),
+        // so reaching these is usually a bug.
+        'ā' => nab::VOWEL_A,
+        'ē' => nab::VOWEL_E,
+        'ī' => nab::VOWEL_I,
+        'ō' => nab::VOWEL_O,
+        'ū' => nab::VOWEL_U,
+
+        // native consonants
+        'm' => nab::CONSONANT_MA,
+        'n' => nab::CONSONANT_NA,
+        'p' => nab::CONSONANT_PA,
+        't' => nab::CONSONANT_TA,
+        'k' => nab::CONSONANT_CA,
+        'κ' => nab::CONSONANT_CUA,
+        'τ' => nab::CONSONANT_TZA,
+        'λ' => nab::CONSONANT_TLA,
+        'ς' => nab::CONSONANT_CHA,
+        's' => nab::CONSONANT_SA,
+        'x' => nab::CONSONANT_XA,
+        'h' => nab::CONSONANT_HA,
+        'l' => nab::CONSONANT_LA,
+        'y' => nab::CONSONANT_YA,
+        'w' => nab::CONSONANT_WA,
+
+        // foreign consonants
+        'ñ' => nab::CONSONANT_NYA,
+        'β' | 'b' | 'v' => nab::CONSONANT_BVA,
+        'd' => nab::CONSONANT_DA,
+        'g' => nab::CONSONANT_GA,
+        'f' => nab::CONSONANT_FA,
+        'r' => nab::CONSONANT_RA,
+        'ρ' => nab::CONSONANT_RRA,
+
+        _ => panic!("no Trager base mapping for {:?}", ch),
+    }
+}
+
+fn unmarked_vowel(ch: char) -> char {
+    match ch {
+        'ā' => 'a',
+        'ē' => 'e',
+        'ī' => 'i',
+        'ō' => 'o',
+        'ū' => 'u',
+        _ => ch,
+    }
+}
+
+fn compound_vowel_sign(pair: &str) -> Option<char> {
+    match pair {
+        "ia" => Some(nab::VOWEL_SIGN_IA),
+        "ai" => Some(nab::VOWEL_SIGN_AI),
+        "oa" => Some(nab::VOWEL_SIGN_OA),
+        "eo" => Some(nab::VOWEL_SIGN_EO),
+        "ei" => Some(nab::VOWEL_SIGN_EI),
+        "io" => Some(nab::VOWEL_SIGN_IO),
+        "ao" => Some(nab::VOWEL_SIGN_AO),
+        _ => None,
+    }
+}
+
+pub fn atomic_to_trager(input: &str) -> String {
+    let chars: Vec<char> = input.chars().collect();
+    let mut out = String::new();
+
+    for i in 0..chars.len() {
+        let current = chars[i];
+
+        let previous = if i > 0 { chars[i - 1] } else { ' ' };
+
+        let next = if i + 1 < chars.len() {
+            chars[i + 1]
+        } else {
+            ' '
+        };
+
+        //
+        // atomic vowel after consonant, or word-initial h + vowel
+        //
+        if is_atomic_vowel(current)
+            && ((is_atomic_consonant(previous) && previous != 'h')
+                || (previous == 'h' && (i == 1 || !is_atomic_letter(chars[i - 2]))))
+        {
+            match current {
+                'a' => {}
+
+                'ā' => out.push(nab::LONG_VOWEL_SIGN),
+
+                'e' => out.push(nab::VOWEL_SIGN_E),
+                'i' => out.push(nab::VOWEL_SIGN_I),
+                'o' => out.push(nab::VOWEL_SIGN_O),
+                'u' => out.push(nab::VOWEL_SIGN_U),
+
+                'ē' => {
+                    out.push(nab::VOWEL_SIGN_E);
+                    out.push(nab::LONG_VOWEL_SIGN);
+                }
+
+                'ī' => {
+                    out.push(nab::VOWEL_SIGN_I);
+                    out.push(nab::LONG_VOWEL_SIGN);
+                }
+
+                'ō' => {
+                    out.push(nab::VOWEL_SIGN_O);
+                    out.push(nab::LONG_VOWEL_SIGN);
+                }
+
+                'ū' => {
+                    out.push(nab::VOWEL_SIGN_U);
+                    out.push(nab::LONG_VOWEL_SIGN);
+                }
+
+                _ => {}
+            }
+        }
+        //
+        // terminal h
+        //
+        else if current == 'h' && is_atomic_vowel(previous) {
+            out.push(nab::SUBJOINER_SIGN);
+            out.push(trager_base('h'));
+        }
+        //
+        // terminal consonant
+        //
+        else if is_atomic_consonant(current)
+            && is_atomic_vowel(previous)
+            && !is_atomic_vowel(next)
+        {
+            out.push(nab::SUBJOINER_SIGN);
+            out.push(trager_base(current));
+        }
+        //
+        // compound vowels
+        //
+        else if is_atomic_vowel(current)
+            && is_atomic_vowel(previous)
+            && i != 1
+            && is_atomic_letter(chars[i - 2])
+        {
+            let pair = format!("{}{}", unmarked_vowel(previous), unmarked_vowel(current));
+
+            if let Some(sign) = compound_vowel_sign(&pair) {
+                if previous == 'a' {
+                    out.push(sign);
+                } else if previous == 'ā' {
+                    out.pop(); // remove LONG_VOWEL_SIGN
+                    out.push(sign);
+                } else {
+                    if unmarked_vowel(previous) == previous {
+                        // previous was short vowel:
+                        // remove the previous vowel sign
+                        out.pop();
+                    } else {
+                        // previous was long vowel:
+                        // remove vowel sign + LONG_VOWEL_SIGN
+                        out.pop();
+                        out.pop();
+                    }
+
+                    out.push(sign);
+                }
+            } else {
+                match current {
+                    'a' => {}
+                    'ā' => {
+                        out.push(nab::VOWEL_A);
+                        out.push(nab::LONG_VOWEL_SIGN);
+                    }
+                    'e' => out.push(nab::VOWEL_E),
+                    'i' => out.push(nab::VOWEL_I),
+                    'o' => out.push(nab::VOWEL_O),
+                    'u' => out.push(nab::VOWEL_U),
+                    'ē' => {
+                        out.push(nab::VOWEL_E);
+                        out.push(nab::LONG_VOWEL_SIGN);
+                    }
+                    'ī' => {
+                        out.push(nab::VOWEL_I);
+                        out.push(nab::LONG_VOWEL_SIGN);
+                    }
+                    'ō' => {
+                        out.push(nab::VOWEL_O);
+                        out.push(nab::LONG_VOWEL_SIGN);
+                    }
+                    'ū' => {
+                        out.push(nab::VOWEL_U);
+                        out.push(nab::LONG_VOWEL_SIGN);
+                    }
+                    _ => {}
+                }
+            }
+        }
+        //
+        // ordinary atomic letter
+        //
+        else if matches!(current, 'ā' | 'ē' | 'ī' | 'ō' | 'ū') {
+            match current {
+                'ā' => {
+                    out.push(nab::VOWEL_A);
+                    out.push(nab::LONG_VOWEL_SIGN);
+                }
+                'ē' => {
+                    out.push(nab::VOWEL_E);
+                    out.push(nab::LONG_VOWEL_SIGN);
+                }
+                'ī' => {
+                    out.push(nab::VOWEL_I);
+                    out.push(nab::LONG_VOWEL_SIGN);
+                }
+                'ō' => {
+                    out.push(nab::VOWEL_O);
+                    out.push(nab::LONG_VOWEL_SIGN);
+                }
+                'ū' => {
+                    out.push(nab::VOWEL_U);
+                    out.push(nab::LONG_VOWEL_SIGN);
+                }
+                _ => unreachable!(),
+            }
+        } else if is_atomic_letter(current) {
+            out.push(trager_base(current));
+        }
+        //
+        // punctuation
+        //
+        else {
+            out.push(current);
+        }
     }
 
     out
@@ -459,5 +719,96 @@ mod tests {
     #[test]
     fn unknown_character_passthrough() {
         assert_eq!(trager_to_atomic("ABC"), "ABC");
+    }
+
+    #[test]
+    fn roundtrip_simple_word() {
+        let atomic = "κaw";
+
+        let trager = atomic_to_trager(atomic);
+
+        assert_eq!(trager_to_atomic(&trager), atomic);
+    }
+
+    #[test]
+    fn roundtrip_long_vowels() {
+        let atomic = "κāwλi";
+
+        let trager = atomic_to_trager(atomic);
+
+        assert_eq!(trager_to_atomic(&trager), atomic);
+    }
+
+    #[test]
+    fn roundtrip_complex_word() {
+        let atomic = "mikλanteκλi";
+
+        let trager = atomic_to_trager(atomic);
+
+        assert_eq!(trager_to_atomic(&trager), atomic);
+    }
+
+    #[test]
+    fn every_encodable_rule_roundtrips() {
+        for (trager, _) in get_trager_to_atomic_rules() {
+            // subjoined consonants are decoder-only
+            if trager.starts_with(nab::SUBJOINER_SIGN) {
+                continue;
+            }
+
+            let atomic = trager_to_atomic(trager);
+            let regenerated = atomic_to_trager(&atomic);
+
+            assert_eq!(trager_to_atomic(&regenerated), atomic);
+        }
+    }
+
+    #[test]
+    fn roundtrip_kia() {
+        let atomic = "kia";
+
+        assert_eq!(trager_to_atomic(&atomic_to_trager(atomic)), atomic);
+    }
+
+    #[test]
+    fn roundtrip_kai() {
+        let atomic = "kai";
+
+        assert_eq!(trager_to_atomic(&atomic_to_trager(atomic)), atomic);
+    }
+
+    #[test]
+    fn roundtrip_koa() {
+        let atomic = "koa";
+
+        assert_eq!(trager_to_atomic(&atomic_to_trager(atomic)), atomic);
+    }
+
+    #[test]
+    fn roundtrip_keo() {
+        let atomic = "keo";
+
+        assert_eq!(trager_to_atomic(&atomic_to_trager(atomic)), atomic);
+    }
+
+    #[test]
+    fn roundtrip_kei() {
+        let atomic = "kei";
+
+        assert_eq!(trager_to_atomic(&atomic_to_trager(atomic)), atomic);
+    }
+
+    #[test]
+    fn roundtrip_kio() {
+        let atomic = "kio";
+
+        assert_eq!(trager_to_atomic(&atomic_to_trager(atomic)), atomic);
+    }
+
+    #[test]
+    fn roundtrip_kao() {
+        let atomic = "kao";
+
+        assert_eq!(trager_to_atomic(&atomic_to_trager(atomic)), atomic);
     }
 }
