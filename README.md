@@ -187,6 +187,22 @@ cargo run --offline --bin evaluate_reconstruction -- my-corpus \
 
 The machine-readable and Markdown reports include corpus/schema/normalization versions, run time, repository version, Git commit and working-tree cleanliness when available, metric definitions, record and exclusion counts, ambiguity-class metrics, and each record's ordered candidates, scores, derivations, projections, and accepted-analysis matches. The evaluator is deterministic for a fixed corpus and code revision except for run timestamp and repository-state metadata. It is offline-only and does not modify reconstruction or ranking behavior.
 
+### Lexical-prior ranking experiment
+
+Compare baseline, lexical-prior, heuristic-only, lexical-only, and combined rankings against an already validated evaluation corpus:
+
+```bash
+mkdir -p results
+cargo run --offline --bin evaluate_ranking -- my-corpus \
+  --lexicon src/data/g2.nfc.txt \
+  --ranker combined \
+  --json results/ranking.json \
+  --markdown results/ranking.md \
+  --top-k 3
+```
+
+The selected ranker determines the report's `final_rank`; the report also retains baseline, lexical-prior, and three ablation metrics, plus each candidate's ranks under all five selections, feature values, baseline heuristic score, and lexical score. The baseline reproduces the existing `Candidate::score()` ordering. The combined score is `100 × lexical_score + heuristic_score`; exact Atomic lexicon matches contribute 2 lexical points and normalized matches contribute 1. Lexical-only ties use Atomic lexical order; baseline and combined ties retain stable candidate order. The lexical resource is a ranking prior, not an independent gold source: report its provenance and overlap with any evaluation sources, and do not interpret results as independent if sources overlap.
+
 ## Architecture
 
 The conversion pipeline normalizes input to Atomic, then renders orthographic or phonetic outputs. `convert_all()` produces SEP and Hasler from the M→F result; the other returned forms are rendered from Atomic. SEP reconstruction is a separate inverse-candidate process and does not change the forward conversion pipeline.
@@ -199,6 +215,7 @@ The main modules are:
 * `trager.rs`: Trager-abugida/Atomic mapping in both directions.
 * `allophones.rs`: M→F rules and F→M helper rules used in conversion and reconstruction.
 * `reconstruction.rs`: candidate generation, forward projection validation, deduplication, derivation tracking, and heuristic ordering.
+* `ranking.rs`: baseline and lexical-prior rankers plus deterministic ranking ablations; this module reorders generated candidates without changing reconstruction.
 * `phonetics.rs`: degemination, syllabification, stress marking, phonetic IPA, and search forms.
 * `geminate.rs` and `en_endings.rs`: implemented lexical gemination patterns and final-`n`/`h` exceptions used by the phonological helpers.
 * `metaword.rs`: punctuation handling, metadata tags, name/deity lists, and locative-suffix classification.
@@ -244,6 +261,7 @@ The main modules are:
 │   ├── metaword.rs
 │   ├── orthography.rs
 │   ├── phonetics.rs
+│   ├── ranking.rs
 │   ├── reconstruction.rs
 │   ├── structure.rs
 │   ├── trager.rs
@@ -252,6 +270,7 @@ The main modules are:
 │   │   ├── reconstruction_coverage.rs
 │   │   ├── reconstruction_metrics.rs
 │   │   ├── reconstruction_ranking.rs
+│   │   ├── evaluate_ranking.rs
 │   │   ├── evaluate_reconstruction.rs
 │   │   └── validate_evaluation_corpus.rs
 │   ├── data/
