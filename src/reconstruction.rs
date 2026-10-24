@@ -96,9 +96,7 @@ pub fn reconstruct_sep(input: &str) -> CandidateSet {
         }
 
         if let Some(recovered) = &final_n_recovery {
-            let coda_after_final_n = recover_coda_w(recovered);
-
-            if coda_after_final_n != *recovered {
+            for coda_after_final_n in recover_coda_w(recovered) {
                 add_candidate(
                     &mut candidates,
                     coda_after_final_n,
@@ -159,8 +157,7 @@ pub fn reconstruct_sep(input: &str) -> CandidateSet {
             }
         }
 
-        let coda_w_recovery = recover_coda_w(&observed);
-        if coda_w_recovery != observed {
+        for coda_w_recovery in recover_coda_w(&observed) {
             add_candidate(
                 &mut candidates,
                 coda_w_recovery,
@@ -210,21 +207,44 @@ pub fn reconstruct_sep(input: &str) -> CandidateSet {
     CandidateSet { candidates, status }
 }
 
-fn recover_coda_w(observed: &str) -> String {
+fn recover_coda_w(observed: &str) -> Vec<String> {
     let chars: Vec<char> = observed.chars().collect();
-    let mut recovered = String::with_capacity(observed.len());
 
-    for (index, &current) in chars.iter().enumerate() {
-        let is_coda_h = current == 'h'
-            && index > 0
-            && index + 1 < chars.len()
-            && is_atomic_vowel(chars[index - 1])
-            && is_atomic_consonant(chars[index + 1]);
+    let positions: Vec<usize> = chars
+        .iter()
+        .enumerate()
+        .filter_map(|(index, &current)| {
+            let is_coda_h = current == 'h'
+                && index > 0
+                && index + 1 < chars.len()
+                && is_atomic_vowel(chars[index - 1])
+                && is_atomic_consonant(chars[index + 1]);
 
-        recovered.push(if is_coda_h { 'w' } else { current });
+            if is_coda_h { Some(index) } else { None }
+        })
+        .collect();
+
+    let mut results = Vec::new();
+
+    // One recovery per position.
+    for &pos in &positions {
+        let mut candidate = chars.clone();
+        candidate[pos] = 'w';
+        results.push(candidate.into_iter().collect());
     }
 
-    recovered
+    // Keep existing behaviour too (all positions).
+    if positions.len() > 1 {
+        let mut candidate = chars.clone();
+
+        for &pos in &positions {
+            candidate[pos] = 'w';
+        }
+
+        results.push(candidate.into_iter().collect());
+    }
+
+    results
 }
 
 fn recover_final_w(observed: &str) -> Option<String> {
@@ -431,7 +451,7 @@ mod tests {
     #[test]
     fn coda_w_recovery_does_not_change_non_coda_h() {
         let observed = to_atomic("nahuatl");
-        assert_eq!(recover_coda_w(&observed), observed);
+        assert!(recover_coda_w(&observed).is_empty());
     }
 
     #[test]
@@ -646,6 +666,38 @@ mod tests {
 
     #[test]
     fn coda_w_can_apply_after_final_n_recovery() {
-        assert_eq!(recover_coda_w("ihkinīn"), "iwkinīn");
+        assert!(recover_coda_w("ihkinīn").contains(&"iwkinīn".to_string()));
+    }
+
+    #[test]
+    fn coda_w_recovers_single_position() {
+        let recoveries = recover_coda_w("mahmahtiā");
+
+        assert!(recoveries.contains(&"mahmawtiā".to_string()));
+    }
+
+    #[test]
+    fn coda_w_generates_partial_recoveries() {
+        let recoveries = recover_coda_w("mahmahtiā");
+
+        assert!(recoveries.contains(&"mawmahtiā".to_string()));
+
+        assert!(recoveries.contains(&"mahmawtiā".to_string()));
+
+        assert!(recoveries.contains(&"mawmawtiā".to_string()));
+    }
+
+    #[test]
+    fn regression_mahmauhtia() {
+        let result = reconstruct_sep("majmajtiā");
+
+        assert!(result.candidates.iter().any(|c| c.atomic == "mahmawtiā"));
+    }
+
+    #[test]
+    fn regression_cuauhmahmantli() {
+        let result = reconstruct_sep("kuajmajmāntli");
+
+        assert!(result.candidates.iter().any(|c| c.atomic == "κawmahmānλi"));
     }
 }
