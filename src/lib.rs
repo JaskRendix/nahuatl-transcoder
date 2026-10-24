@@ -3,6 +3,7 @@ pub mod allophones;
 pub mod atomic;
 pub mod constants;
 pub mod en_endings;
+pub mod evaluation;
 pub mod geminate;
 pub mod metaword;
 pub mod orthography;

@@ -149,6 +149,26 @@ cargo run --bin reconstruction_ranking
 
 These are diagnostics over the bundled lexicon, not an independently annotated evaluation set. They parse headwords from the file and apply this project's own conversion and reconstruction functions. In the current run, the ranking binary processed 6,033 headwords and reported 88.56% top-1 and 98.28% top-3 recovery of the input-derived Atomic form. These figures should not be interpreted as real-world reconstruction accuracy; additional reported figures and caveats are recorded in [the lexical ambiguity notes](docs/lexical_ambiguities.md).
 
+### Evaluation corpus validation
+
+The offline validator checks a corpus directory containing a `manifest.json` and a `records.jsonl` file. Its serde-based schema and validation rules are implemented in `src/evaluation/`; it does not fetch sources or evaluate reconstruction metrics.
+
+```text
+my-corpus/
+├── manifest.json
+└── records.jsonl
+```
+
+Each nonblank JSONL line is one evaluation record with its observed and normalized SEP strings, adjudicated analyses, dialect, source reference, provenance, license reference, and optional notes. The manifest declares the corpus and schema versions, normalization version, source and license registries, ambiguity classes, and permitted splits. The complete field definitions, status/split assumptions, and synthetic examples are in [the evaluation architecture](docs/independent-reconstruction-evaluation.md) and [tests/evaluation/valid_corpus/](tests/evaluation/valid_corpus/).
+
+Run validation from the repository root:
+
+```bash
+cargo run --offline --bin validate_evaluation_corpus -- my-corpus
+```
+
+The command exits successfully only when the manifest and all records validate. Errors include the record identifier (or manifest/line marker), field path, and a human-readable explanation. All validation is local and offline.
+
 ## Architecture
 
 The conversion pipeline normalizes input to Atomic, then renders orthographic or phonetic outputs. `convert_all()` produces SEP and Hasler from the M→F result; the other returned forms are rendered from Atomic. SEP reconstruction is a separate inverse-candidate process and does not change the forward conversion pipeline.
@@ -164,7 +184,8 @@ The main modules are:
 * `phonetics.rs`: degemination, syllabification, stress marking, phonetic IPA, and search forms.
 * `geminate.rs` and `en_endings.rs`: implemented lexical gemination patterns and final-`n`/`h` exceptions used by the phonological helpers.
 * `metaword.rs`: punctuation handling, metadata tags, name/deity lists, and locative-suffix classification.
-* `src/bin/`: the `c2m` converter and three lexicon reconstruction diagnostics.
+* `evaluation/`: serde corpus structures and offline corpus validation.
+* `src/bin/`: the `c2m` converter, three lexicon reconstruction diagnostics, and the evaluation-corpus validator.
 
 ## Project layout
 
@@ -179,6 +200,7 @@ The main modules are:
 ├── README.md
 ├── docs/
 │   ├── lexical_ambiguities.md
+│   ├── independent-reconstruction-evaluation.md
 │   ├── reconstruction-evaluation.md
 │   ├── trager-phonology-notes-es.md
 │   └── trager-phonology-reference.md
@@ -204,17 +226,30 @@ The main modules are:
 │   │   ├── c2m.rs
 │   │   ├── reconstruction_coverage.rs
 │   │   ├── reconstruction_metrics.rs
-│   │   └── reconstruction_ranking.rs
-│   └── data/
-│       ├── deities.txt
-│       ├── g2.nfc.txt
-│       ├── given_names.txt
-│       └── surnames.txt
+│   │   ├── reconstruction_ranking.rs
+│   │   └── validate_evaluation_corpus.rs
+│   ├── data/
+│   │   ├── deities.txt
+│   │   ├── g2.nfc.txt
+│   │   ├── given_names.txt
+│   │   └── surnames.txt
+│   └── evaluation/
+│       ├── errors.rs
+│       ├── mod.rs
+│       ├── schema.rs
+│       └── validation.rs
 └── tests/
+    ├── evaluation.rs
     ├── golden.rs
     ├── metaword.rs
     ├── reconstruction_cases.rs
-    └── reconstruction_corpus.rs
+    ├── reconstruction_corpus.rs
+    └── evaluation/
+        ├── valid_corpus/
+        ├── duplicate_ids/
+        ├── bad_status/
+        ├── bad_ambiguity/
+        └── missing_analysis/
 ```
 
 ## Background
