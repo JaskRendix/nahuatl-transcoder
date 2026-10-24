@@ -1,19 +1,19 @@
-# lexical ambiguities update
+# Lexical ambiguity and ranking notes
 
-the reconstruction engine just ran against `g2.nfc.txt` (6,033 headwords). here is where things stand:
+The repository's reconstruction diagnostics were run against `g2.nfc.txt`. The current run processes 6,033 headwords; results below describe this bundled lexicon and the project's own conversion and reconstruction code.
 
-* **coverage:** 100% (6033/6033 recovered)
+* **candidate coverage:** 100% (6,033/6,033 input-derived Atomic forms found among candidates)
 * **misses:** 0
 * **original form recovered:** 100%
-* **sole hits:** 99.80% (6021/6033)
+* **original was the sole lexicon hit:** 99.80% (6,021/6,033)
 
-the 12 cases with multiple hits are not engine failures. SEP orthography drops distinctions that exist in deeper layers, so distinct original words collapse into the same SEP string. this is structural information loss, not a bug in the code.
+The 12 headword entries with multiple lexicon hits form six pairs that share a SEP output in this run. These are observed collisions under the implemented forward mapping; the result is specific to this lexicon and does not establish that every candidate is linguistically valid.
 
 ---
 
-## ambiguity types
+## Ambiguity types
 
-### final-h vs final-n
+### Final `h` vs. final `n`
 
 SEP collapses `-h` and `-n` into `j`.
 
@@ -21,29 +21,29 @@ SEP collapses `-h` and `-n` into `j`.
 * `tlah` / `tlan` $\rightarrow$ `tlaj`
 * `tleh` / `tlen` $\rightarrow$ `tlej`
 
-reconstructing any of these outputs both deep forms, which are valid in the lexicon.
+Reconstructing any of these outputs yields both forms as candidates; both occur as entries in the bundled lexicon.
 
-### final-w vs final-n
+### Final `w` vs. final `n`
 
 SEP maps both `-w` (`-uh`) and `-n` to `j` in certain environments.
 
 * `tiuh` / `tin` $\rightarrow$ `tij` (reconstructs to `tiw` / `tin`)
 
-### k-lenition
+### Coda-`k` lenition
 
 forward phonology neutralizes coda `k` against `h`.
 
 * `quechcuayohtli` / `quechcuayoctli` $\rightarrow$ `kechkuayojtli`
 
-### coda-w
+### Coda `w`
 
-coda `w` drops or assimilates in SEP.
+The implemented M→F rule changes coda `w` to `h`, which the SEP renderer writes as `j` in the example below.
 
 * `cuahyōlli` / `cuauhyōlli` $\rightarrow$ `kuajyōlli`
 
 ---
 
-## the 12 ambiguous collisions
+## The 12 ambiguous entries
 
 ```text
 cuahyōlli      <-> cuauhyōlli
@@ -54,23 +54,23 @@ tlah           <-> tlan
 tleh           <-> tlen
 ```
 
-each pair accounts for 2 lexicon entries, totaling the 12 non-unique hits.
+Each pair accounts for two lexicon entries, for 12 entries with non-unique lexicon hits.
 
 ---
 
 ## takeaway
 
-the engine pulls every valid deep form that maps to the target SEP string. when it returns multiple hits, the conflict exists in the forward mapping pipeline itself:
+For these listed headwords, the diagnostic finds both lexicon forms as candidates for the shared SEP output. This illustrates information loss in the implemented forward mapping:
 
 ```text
 ACK / Atomic -> SEP -> Reconstruction
 ```
 
-SEP discards data, so pure reverse lookup cannot pick a single winner without extra context.
+SEP may discard distinctions, so reverse mapping alone need not identify a unique underlying form. This observation applies to the listed examples; it does not establish completeness of candidate generation for all forms.
 
 ---
 
-## ranking performance
+## Ranking performance
 
 Using the current derivation-based scoring heuristic on the full `g2.nfc.txt` lexicon:
 
@@ -84,7 +84,7 @@ Mean rank: 1.202
 Worst rank: 22
 ```
 
-## rank distribution
+## Rank distribution
 
 ```text
 Rank 1 : 5343 (88.56%)
@@ -95,47 +95,47 @@ Rank 4+:  104 ( 1.72%)
 
 ## interpretation
 
-The reconstruction engine already achieves:
+For this bundled lexicon run, the reconstruction engine achieves:
 
 ```text
 Coverage: 100%
 Misses:   0
 ```
 
-so candidate ordering is now the primary remaining problem. the current heuristic places the original lexical form:
+The current heuristic places the input-derived Atomic form:
 
 ```text
 1st place 88.56% of the time
 Top 3     98.28% of the time
 ```
 
-which means the reconstruction problem is effectively solved:
+These are lexicon-run ranking results, not accuracy estimates for independent SEP data:
 
 ```text
 Correct candidate missing          : 0.00%
 Correct candidate not ranked #1    : 11.44%
 ```
 
-the search space is effectively complete. future work focuses on selecting the most likely candidate among multiple valid reconstructions rather than expanding reconstruction coverage.
+They do not establish that the candidate space is complete or that the highest-ranked form is the most likely linguistic analysis. Independent evaluation is needed to measure both missed analyses and unsupported candidates.
 
 ---
 
-## next up
+## Possible future work
 
 * frequency weights
 * morphological parsing
 * context awareness
 * ML disambiguation
 
-these will help rank the candidates, but the underlying SEP collisions remain fixed.
+These may help rank candidates, but the observed SEP collisions cannot be resolved from the SEP form alone.
 
 ---
 
-# historical progress update
+# Historical progress notes
 
-the reconstruction engine did not hit full coverage overnight.
+The following progression is retained from earlier documented benchmark runs:
 
-early runs on `g2.nfc.txt` missed a chunk of entries. rule tweaks squeezed the miss count down in steps:
+Early runs on `g2.nfc.txt` missed entries. The documented miss count decreased in these steps:
 
 ```text
 87 -> 69 -> 28 -> 13 -> 3 -> 0
@@ -143,7 +143,7 @@ early runs on `g2.nfc.txt` missed a chunk of entries. rule tweaks squeezed the m
 
 ---
 
-## main fixes that moved the needle
+## Documented changes during that progression
 
 * **labialized affricates:** fixed `chua`, `chue`, and `chui` sequences
 * **rule composition:** stacked `FinalNRecovery` with `CodaWRecovery`
@@ -155,7 +155,7 @@ early runs on `g2.nfc.txt` missed a chunk of entries. rule tweaks squeezed the m
 
 ---
 
-## end result
+## Recorded end result
 
 ```text
 Recovered entries: 6033 / 6033
@@ -163,11 +163,11 @@ Misses:            0
 Coverage:          100.00%
 ```
 
-this progression demonstrates that reconstruction coverage is complete. the remaining edge cases are not unrecovered entries but genuine lexical collisions introduced by SEP orthography.
+These historical counts describe intermediate runs, not independently reproducible results from this repository. The current diagnostic run reports the lexicon figures above; neither these figures nor the historical progression establish complete coverage of naturally occurring SEP forms.
 
 ---
 
-## stats summary
+## Statistics summary
 
 ```text
 Lexicon entries:           6033
@@ -185,4 +185,4 @@ Mean rank:                 1.202
 Worst rank:                22
 ```
 
-full coverage achieved. every ambiguity left is a real collision from the forward transform.
+The figures above are specific to the bundled lexicon and current implementation. They do not show that every remaining ambiguity in other data is a collision, or that reconstruction is complete for all Nahuatl varieties and sources.

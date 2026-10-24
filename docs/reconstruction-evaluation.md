@@ -39,9 +39,11 @@ The benchmark has 295 fixture entries and 148 distinct input forms. Repeated inp
 | After `KLenitionRecovery` | 98.64% |
 | After `KwRecovery` | 100.00% |
 
+The stage-wise percentages are retained from earlier documented benchmark runs. The repository does not include the intermediate implementations needed to reproduce each stage, so these values are not presented as measurements of the current implementation.
+
 Current metrics:
-- Average candidate-set size: **1.461**
-- Maximum candidate-set size: **7**
+- Average candidate-set size: **1.556**
+- Maximum candidate-set size: **10**
 - No-candidate rate: **0.00%**
 - Candidate recall: **100.00%**
 
@@ -55,7 +57,9 @@ Recall does not show whether every candidate is plausible or whether the candida
 - **`KLenitionRecovery`** — proposes `k` from surface `h` in the context of the forward coda-`k` lenition rule.
 - **`KwRecovery`** — proposes underlying `κ` where forward conversion can produce coda `k` or `h`, including the relevant context before `k`.
 
-These rules generate candidates; they do not rank them. Each candidate must pass the forward projection check.
+The listed recovery transforms generate candidates; candidate ordering happens separately. Each proposed candidate must pass the forward projection check.
+
+After candidate generation and deduplication, `reconstruct_sep()` orders candidates by `Candidate::score()`. The score adds 10 for `Unchanged`, subtracts 1 for each `FinalNRecovery` and `FinalWRecovery` label, and subtracts 2 for each `KLenitionRecovery` and `CodaWRecovery` label. The other derivation labels do not affect the score. This is a heuristic ordering, not a calibrated probability or an independently validated measure of linguistic likelihood.
 
 ## Test coverage
 
@@ -77,6 +81,8 @@ original form → convert_all() → generated SEP → reconstruct_sep()
 For every fixture entry, the Atomic form produced by `convert_all()` appears among the candidates generated from that same conversion’s SEP output.
 
 It does **not** mean that 100% of real SEP forms can be reconstructed correctly. The surface forms and expected underlying forms both come from the project’s conversion path. The benchmark tests whether inverse candidate generation covers the forward rules used by these fixtures. Since projection validation uses the same forward implementation, it checks internal consistency, not independent linguistic accuracy.
+
+The current test run reports an average of 1.556 candidates per fixture entry and a maximum of 10 (295 entries total). These values describe the candidate-set sizes produced for this fixture, not candidate precision or expected ambiguity in naturally occurring SEP data.
 
 Other limits:
 - `words.txt` and `golden.csv` are conversion and regression fixtures, not a representative SEP corpus with underlying-form annotations.
