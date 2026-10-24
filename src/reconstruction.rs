@@ -9,6 +9,7 @@ pub enum Derivation {
     Unchanged,
     FToM,
     FinalNRecovery,
+    FinalWRecovery,
     CodaWRecovery,
     KLenitionRecovery,
     KwRecovery,
@@ -90,6 +91,15 @@ pub fn reconstruct_sep(input: &str) -> CandidateSet {
                 &mut candidates,
                 recovered.clone(),
                 Derivation::FinalNRecovery,
+                &observed,
+            );
+        }
+
+        if let Some(final_w_recovery) = recover_final_w(&observed) {
+            add_candidate(
+                &mut candidates,
+                final_w_recovery,
+                Derivation::FinalWRecovery,
                 &observed,
             );
         }
@@ -204,6 +214,20 @@ fn recover_coda_w(observed: &str) -> String {
     recovered
 }
 
+fn recover_final_w(observed: &str) -> Option<String> {
+    let chars: Vec<char> = observed.chars().collect();
+
+    if chars.len() >= 2 && chars.last() == Some(&'h') && is_atomic_vowel(chars[chars.len() - 2]) {
+        let mut recovered = observed.to_string();
+        recovered.pop();
+        recovered.push('w');
+
+        Some(recovered)
+    } else {
+        None
+    }
+}
+
 fn recover_k_lenition(observed: &str) -> Vec<String> {
     let chars: Vec<char> = observed.chars().collect();
 
@@ -214,9 +238,9 @@ fn recover_k_lenition(observed: &str) -> Vec<String> {
             let matches_k_lenition_context = current == 'h'
                 && index > 0
                 && index + 2 < chars.len()
-                && matches!(chars[index - 1], 'a' | 'e' | 'i' | 'o')
+                && is_atomic_vowel(chars[index - 1])
                 && is_atomic_consonant(chars[index + 1])
-                && matches!(chars[index + 2], 'a' | 'e' | 'i' | 'o');
+                && is_atomic_vowel(chars[index + 2]);
 
             if !matches_k_lenition_context {
                 return None;
@@ -237,13 +261,13 @@ fn recover_kw(observed: &str) -> Vec<String> {
         .enumerate()
         .filter_map(|(index, &current)| {
             let is_coda_context = index > 0
-                && matches!(chars[index - 1], 'a' | 'e' | 'i' | 'o')
+                && is_atomic_vowel(chars[index - 1])
                 && ((current == 'h'
                     && index + 1 < chars.len()
                     && (chars[index + 1] == 'k'
                         || (index + 2 < chars.len()
                             && is_atomic_consonant(chars[index + 1])
-                            && matches!(chars[index + 2], 'a' | 'e' | 'i' | 'o'))))
+                            && is_atomic_vowel(chars[index + 2]))))
                     || (current == 'k'
                         && (index + 1 == chars.len() || is_atomic_consonant(chars[index + 1]))));
 
@@ -531,5 +555,19 @@ mod tests {
                 );
             }
         }
+    }
+
+    #[test]
+    fn final_w_recovery_xiuh() {
+        let result = reconstruct_sep("xij");
+
+        assert!(result.candidates.iter().any(|c| c.atomic == "xiw"));
+    }
+
+    #[test]
+    fn final_w_recovery_yauh() {
+        let result = reconstruct_sep("yaj");
+
+        assert!(result.candidates.iter().any(|c| c.atomic == "yaw"));
     }
 }
