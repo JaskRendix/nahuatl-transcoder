@@ -26,6 +26,34 @@ pub struct Candidate {
     pub derivations: Vec<Derivation>,
 }
 
+impl Candidate {
+    pub fn score(&self) -> i32 {
+        let mut score = 0;
+
+        if self.derivations.contains(&Derivation::Unchanged) {
+            score += 10;
+        }
+
+        if self.derivations.contains(&Derivation::FinalNRecovery) {
+            score -= 1;
+        }
+
+        if self.derivations.contains(&Derivation::FinalWRecovery) {
+            score -= 1;
+        }
+
+        if self.derivations.contains(&Derivation::KLenitionRecovery) {
+            score -= 2;
+        }
+
+        if self.derivations.contains(&Derivation::CodaWRecovery) {
+            score -= 2;
+        }
+
+        score
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum CandidateStatus {
     NoCandidates,
@@ -225,6 +253,8 @@ pub fn reconstruct_sep(input: &str) -> CandidateSet {
         1 => CandidateStatus::Unique,
         _ => CandidateStatus::Ambiguous,
     };
+
+    candidates.sort_by_key(|c| std::cmp::Reverse(c.score()));
 
     CandidateSet { candidates, status }
 }
