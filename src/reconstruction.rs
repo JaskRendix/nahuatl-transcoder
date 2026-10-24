@@ -95,6 +95,19 @@ pub fn reconstruct_sep(input: &str) -> CandidateSet {
             );
         }
 
+        if let Some(recovered) = &final_n_recovery {
+            let coda_after_final_n = recover_coda_w(recovered);
+
+            if coda_after_final_n != *recovered {
+                add_candidate(
+                    &mut candidates,
+                    coda_after_final_n,
+                    Derivation::CodaWRecovery,
+                    &observed,
+                );
+            }
+        }
+
         if let Some(final_w_recovery) = recover_final_w(&observed) {
             add_candidate(
                 &mut candidates,
@@ -569,5 +582,70 @@ mod tests {
         let result = reconstruct_sep("yaj");
 
         assert!(result.candidates.iter().any(|c| c.atomic == "yaw"));
+    }
+
+    #[test]
+    fn final_w_recovery_iuhquinin() {
+        let result = reconstruct_sep("ijkinīj");
+        assert!(result.candidates.iter().any(|c| c.atomic == "iwkinīn"));
+    }
+
+    #[test]
+    fn final_w_recovery_xiuhtenan() {
+        let result = reconstruct_sep("xijtēnāj");
+        assert!(result.candidates.iter().any(|c| c.atomic == "xiwtēnān"));
+    }
+
+    #[test]
+    fn recovery_chain_h_to_n_then_k() {
+        let result = reconstruct_sep("ijkātsaj");
+        assert!(result.candidates.iter().any(|c| c.atomic == "iwkāτan"));
+    }
+
+    #[test]
+    fn regression_iuhquinin() {
+        let result = reconstruct_sep("ijkinīj");
+
+        assert!(result.candidates.iter().any(|c| c.ack == "iuhquinīn"));
+    }
+
+    #[test]
+    fn regression_queuhquinon() {
+        let result = reconstruct_sep("kejkinoj");
+
+        assert!(result.candidates.iter().any(|c| c.ack == "queuhquinon"));
+    }
+
+    #[test]
+    fn combined_recoveries_can_stack() {
+        let result = reconstruct_sep("ijkinoj");
+
+        assert!(
+            result
+                .candidates
+                .iter()
+                .any(|c| c.derivations.contains(&Derivation::FinalNRecovery)
+                    || c.derivations.contains(&Derivation::FinalWRecovery))
+        );
+    }
+
+    #[test]
+    fn chui_is_normalized_correctly() {
+        assert_eq!(to_atomic("pachuiliā"), "paςwiliā");
+    }
+
+    #[test]
+    fn chue_is_normalized_correctly() {
+        assert_eq!(to_atomic("cochuetsi"), "koςweτi");
+    }
+
+    #[test]
+    fn chua_is_normalized_correctly() {
+        assert_eq!(to_atomic("cochuatāni"), "koςwatāni");
+    }
+
+    #[test]
+    fn coda_w_can_apply_after_final_n_recovery() {
+        assert_eq!(recover_coda_w("ihkinīn"), "iwkinīn");
     }
 }
