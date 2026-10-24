@@ -72,15 +72,15 @@ const GENERAL_TO_ATOMIC: &[(&str, &str)] = &[
     // assimilation
     ("np", "mp"),
     // digraphs
+    ("ch", "ς"),
+    ("tz", "τ"),
+    ("ts", "τ"),
+    ("tl", "λ"),
     ("hu", "w"),
     ("uh", "w"),
     ("qu", "k"),
     ("cu", "κ"),
     ("uc", "κ"),
-    ("tz", "τ"),
-    ("ts", "τ"),
-    ("tl", "λ"),
-    ("ch", "ς"),
     // c disambiguation
     ("ca", "ka"),
     ("co", "ko"),
@@ -205,6 +205,11 @@ mod tests {
     #[test]
     fn kw_to_kappa() {
         assert_eq!(to_atomic("kwalli"), "κalli");
+    }
+
+    #[test]
+    fn chui_is_parsed_as_ch_plus_ui() {
+        assert_eq!(to_atomic("pachuiliā"), "paςwiliā");
     }
 
     #[test]
