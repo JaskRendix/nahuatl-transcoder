@@ -6,14 +6,8 @@ use super::metrics::MetricSummary;
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct BenchmarkReport {
-    pub corpus_id: String,
-    pub corpus_version: String,
-    pub schema_version: String,
-    pub normalization_version: String,
-    pub run_timestamp: String,
-    pub git_commit: Option<String>,
-    pub git_working_tree_clean: Option<bool>,
-    pub repository_version: String,
+    #[serde(flatten)]
+    pub metadata: BenchmarkMetadata,
     pub configured_top_k: usize,
     pub total_record_count: usize,
     pub excluded_record_count: usize,
@@ -22,6 +16,22 @@ pub struct BenchmarkReport {
     pub metrics: MetricSummary,
     pub ambiguity_class_metrics: BTreeMap<String, MetricSummary>,
     pub record_results: Vec<RecordResult>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct BenchmarkMetadata {
+    pub corpus_id: String,
+    pub corpus_version: String,
+    pub schema_version: String,
+    pub normalization_version: String,
+    pub run_timestamp: String,
+    pub git_commit: Option<String>,
+    pub git_working_tree_clean: Option<bool>,
+    pub repository_version: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub lexical_resource_path: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub lexical_resource_checksum: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -71,17 +81,18 @@ impl BenchmarkReport {
              - Records: {} total, {} eligible, {} excluded\n\n\
              ## Aggregate metrics\n\n\
              | Metric | Value |\n|---|---:|\n",
-            self.corpus_id,
-            self.corpus_version,
-            self.schema_version,
-            self.normalization_version,
-            self.run_timestamp,
-            self.git_commit.as_deref().unwrap_or("unavailable"),
-            self.git_working_tree_clean
+            self.metadata.corpus_id,
+            self.metadata.corpus_version,
+            self.metadata.schema_version,
+            self.metadata.normalization_version,
+            self.metadata.run_timestamp,
+            self.metadata.git_commit.as_deref().unwrap_or("unavailable"),
+            self.metadata
+                .git_working_tree_clean
                 .map(|clean| clean.to_string())
                 .as_deref()
                 .unwrap_or("unavailable"),
-            self.repository_version,
+            self.metadata.repository_version,
             self.configured_top_k,
             self.total_record_count,
             self.metrics.record_count,
@@ -233,14 +244,18 @@ mod tests {
     #[test]
     fn markdown_contains_reproducibility_metadata_and_metric_denominators() {
         let report = BenchmarkReport {
-            corpus_id: "fixture".into(),
-            corpus_version: "1".into(),
-            schema_version: "schema".into(),
-            normalization_version: "norm".into(),
-            run_timestamp: "2026-01-01T00:00:00Z".into(),
-            git_commit: None,
-            git_working_tree_clean: None,
-            repository_version: "0.1".into(),
+            metadata: super::BenchmarkMetadata {
+                corpus_id: "fixture".into(),
+                corpus_version: "1".into(),
+                schema_version: "schema".into(),
+                normalization_version: "norm".into(),
+                run_timestamp: "2026-01-01T00:00:00Z".into(),
+                git_commit: None,
+                git_working_tree_clean: None,
+                repository_version: "0.1".into(),
+                lexical_resource_path: None,
+                lexical_resource_checksum: None,
+            },
             configured_top_k: 3,
             total_record_count: 1,
             excluded_record_count: 0,

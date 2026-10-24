@@ -2,8 +2,8 @@ use std::env;
 use std::process::ExitCode;
 
 use nahuatl_transcoder::{
-    evaluation::validate_corpus_dir,
-    ranking::{LexicalInventory, RankerSelection, compare_corpus_rankers_with_selection},
+    evaluation::{prepare_benchmark, sha256_bytes, validate_corpus_dir},
+    ranking::{LexicalInventory, RankerSelection, compare_prepared_rankers},
 };
 
 fn usage(program: &str) {
@@ -86,11 +86,20 @@ fn run() -> Result<(), ExitCode> {
             return Err(ExitCode::FAILURE);
         }
     };
-    let inventory = LexicalInventory::load_g2(&lexicon_path).map_err(|error| {
+    let lexical_bytes = std::fs::read(&lexicon_path).map_err(|error| {
         eprintln!("Could not load lexical resource {}: {error}", lexicon_path);
         ExitCode::FAILURE
     })?;
-    let report = compare_corpus_rankers_with_selection(&corpus, &inventory, top_k, selected_ranker);
+    let inventory = LexicalInventory::from_g2_bytes(&lexical_bytes).map_err(|error| {
+        eprintln!("Could not parse lexical resource {}: {error}", lexicon_path);
+        ExitCode::FAILURE
+    })?;
+    let lexical_checksum = sha256_bytes(&lexical_bytes);
+    let prepared = prepare_benchmark(
+        &corpus,
+        Some((std::path::Path::new(&lexicon_path), &lexical_checksum)),
+    );
+    let report = compare_prepared_rankers(&prepared, &inventory, top_k, selected_ranker);
     let json = serde_json::to_string_pretty(&report).map_err(|error| {
         eprintln!("Could not serialize ranking comparison: {error}");
         ExitCode::FAILURE

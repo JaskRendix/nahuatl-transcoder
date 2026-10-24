@@ -1,14 +1,14 @@
-use std::collections::{BTreeMap, BTreeSet, HashSet};
-use std::fs::File;
-use std::io::{BufRead, BufReader};
+use std::collections::{BTreeMap, HashSet};
 use std::path::Path;
 
 use serde::{Deserialize, Serialize};
 
 use crate::atomic::to_atomic;
+use crate::evaluation::benchmark::{PreparedBenchmark, prepare_benchmark};
 use crate::evaluation::metrics::{MetricSummary, RecordEvaluation, summarize};
-use crate::reconstruction::{Candidate, reconstruct_sep};
-use crate::{convert_all, evaluation::ValidatedCorpus, evaluation::schema::GoldStatus};
+use crate::evaluation::report::BenchmarkMetadata;
+use crate::reconstruction::Candidate;
+use crate::{convert_all, evaluation::ValidatedCorpus};
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct CandidateFeatures {
@@ -65,10 +65,14 @@ impl LexicalInventory {
     }
 
     pub fn load_g2(path: impl AsRef<Path>) -> Result<Self, std::io::Error> {
-        let reader = BufReader::new(File::open(path)?);
+        Self::from_g2_bytes(&std::fs::read(path)?)
+    }
+
+    pub fn from_g2_bytes(contents: &[u8]) -> Result<Self, std::io::Error> {
+        let contents = std::str::from_utf8(contents)
+            .map_err(|error| std::io::Error::new(std::io::ErrorKind::InvalidData, error))?;
         let mut headwords = Vec::new();
-        for line in reader.lines() {
-            let line = line?;
+        for line in contents.lines() {
             let Some(headword) = line.trim().split('.').next() else {
                 continue;
             };
@@ -124,6 +128,43 @@ impl Ranker for LexicalPriorRanker {
     }
 }
 
+#[derive(Debug, Clone, PartialEq)]
+pub struct RankerEvaluation {
+    pub metrics: MetricSummary,
+    pub ranked_candidates: Vec<Vec<RankedCandidate>>,
+}
+
+pub fn evaluate_ranker(
+    prepared: &PreparedBenchmark,
+    inventory: &LexicalInventory,
+    ranker: &dyn Ranker,
+    top_k: usize,
+) -> RankerEvaluation {
+    let ranked_candidates: Vec<Vec<RankedCandidate>> = prepared
+        .records
+        .iter()
+        .map(|record| ranker.rank(&record.candidates, inventory))
+        .collect();
+    let record_evaluations = prepared
+        .records
+        .iter()
+        .zip(&ranked_candidates)
+        .map(|(record, candidates)| RecordEvaluation {
+            record_id: record.record_id.clone(),
+            ambiguity_classes: record.ambiguity_classes.clone(),
+            accepted_analyses: record.accepted_atomic.iter().cloned().collect(),
+            candidates: candidates
+                .iter()
+                .map(|candidate| candidate.atomic.clone())
+                .collect(),
+        })
+        .collect::<Vec<_>>();
+    RankerEvaluation {
+        metrics: summarize(&record_evaluations, top_k),
+        ranked_candidates,
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct AblationResult {
     pub name: String,
@@ -158,6 +199,8 @@ pub struct CandidateRankingComparison {
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct RankingComparisonReport {
+    #[serde(flatten)]
+    pub metadata: BenchmarkMetadata,
     pub lexical_entry_count: usize,
     pub total_record_count: usize,
     pub excluded_record_count: usize,
@@ -257,31 +300,54 @@ pub fn compare_corpus_rankers_with_selection(
     top_k: usize,
     selected_ranker: RankerSelection,
 ) -> RankingComparisonReport {
-    let mut excluded_record_ids = Vec::new();
-    let mut side_by_side = Vec::new();
+    let prepared = prepare_benchmark(corpus, None);
+    compare_prepared_rankers(&prepared, inventory, top_k, selected_ranker)
+}
 
-    for record in &corpus.records {
-        if record.gold.status == GoldStatus::InsufficientEvidence {
-            excluded_record_ids.push(record.record_id.clone());
-            continue;
-        }
-        let accepted: BTreeSet<String> = record
-            .gold
-            .analyses
-            .iter()
-            .map(|analysis| to_atomic(&analysis.atomic))
-            .collect();
-        let candidates = reconstruct_sep(&record.sep.normalized).candidates;
-        let candidate_orders: BTreeMap<RankerSelection, Vec<RankedCandidate>> = [
-            RankerSelection::Baseline,
-            RankerSelection::LexicalPrior,
-            RankerSelection::HeuristicOnly,
-            RankerSelection::LexicalOnly,
-            RankerSelection::Combined,
-        ]
-        .into_iter()
-        .map(|selection| (selection, rank_with(&candidates, inventory, selection)))
+pub fn compare_prepared_rankers(
+    prepared: &PreparedBenchmark,
+    inventory: &LexicalInventory,
+    top_k: usize,
+    selected_ranker: RankerSelection,
+) -> RankingComparisonReport {
+    let baseline = evaluate_ranker(prepared, inventory, &BaselineRanker, top_k);
+    let lexical_prior = evaluate_ranker(prepared, inventory, &LexicalPriorRanker, top_k);
+    let selections = [
+        RankerSelection::HeuristicOnly,
+        RankerSelection::LexicalOnly,
+        RankerSelection::Combined,
+    ];
+    let ablation_records: Vec<BTreeMap<RankerSelection, Vec<RankedCandidate>>> = prepared
+        .records
+        .iter()
+        .enumerate()
+        .map(|(index, record)| {
+            selections
+                .iter()
+                .copied()
+                .map(|selection| {
+                    (
+                        selection,
+                        rank_with(&record.candidates, inventory, selection),
+                    )
+                })
+                .chain([
+                    (
+                        RankerSelection::Baseline,
+                        baseline.ranked_candidates[index].clone(),
+                    ),
+                    (
+                        RankerSelection::LexicalPrior,
+                        lexical_prior.ranked_candidates[index].clone(),
+                    ),
+                ])
+                .collect()
+        })
         .collect();
+
+    let mut side_by_side = Vec::new();
+    for (record, candidate_orders) in prepared.records.iter().zip(&ablation_records) {
+        let accepted = &record.accepted_atomic;
         let baseline = ranks(&candidate_orders[&RankerSelection::Baseline]);
         let lexical = ranks(&candidate_orders[&RankerSelection::LexicalPrior]);
         let heuristic = ranks(&candidate_orders[&RankerSelection::HeuristicOnly]);
@@ -315,7 +381,7 @@ pub fn compare_corpus_rankers_with_selection(
             .collect();
         side_by_side.push(RecordRankingComparison {
             record_id: record.record_id.clone(),
-            accepted_atomic: accepted.into_iter().collect(),
+            accepted_atomic: accepted.iter().cloned().collect(),
             candidates,
         });
     }
@@ -328,38 +394,20 @@ pub fn compare_corpus_rankers_with_selection(
     let ablations = selections
         .into_iter()
         .map(|(name, selection)| {
-            let ranked_examples: Vec<RecordEvaluation> = corpus
+            let ranked_examples = prepared
                 .records
                 .iter()
-                .filter(|record| record.gold.status != GoldStatus::InsufficientEvidence)
-                .map(|record| {
-                    let accepted: BTreeSet<String> = record
-                        .gold
-                        .analyses
+                .zip(&ablation_records)
+                .map(|(record, candidates)| RecordEvaluation {
+                    record_id: record.record_id.clone(),
+                    ambiguity_classes: record.ambiguity_classes.clone(),
+                    accepted_analyses: record.accepted_atomic.iter().cloned().collect(),
+                    candidates: candidates[&selection]
                         .iter()
-                        .map(|analysis| to_atomic(&analysis.atomic))
-                        .collect();
-                    let ranked = rank_with(
-                        &reconstruct_sep(&record.sep.normalized).candidates,
-                        inventory,
-                        selection,
-                    );
-                    RecordEvaluation {
-                        record_id: record.record_id.clone(),
-                        ambiguity_classes: record
-                            .gold
-                            .ambiguity_classes
-                            .iter()
-                            .map(|class| class.as_str().to_owned())
-                            .collect(),
-                        accepted_analyses: accepted.into_iter().collect(),
-                        candidates: ranked
-                            .into_iter()
-                            .map(|candidate| candidate.atomic)
-                            .collect(),
-                    }
+                        .map(|candidate| candidate.atomic.clone())
+                        .collect(),
                 })
-                .collect();
+                .collect::<Vec<_>>();
             AblationResult {
                 name: name.to_owned(),
                 metrics: summarize(&ranked_examples, top_k),
@@ -369,67 +417,21 @@ pub fn compare_corpus_rankers_with_selection(
 
     RankingComparisonReport {
         lexical_entry_count: inventory.len(),
-        total_record_count: corpus.records.len(),
-        excluded_record_count: excluded_record_ids.len(),
-        excluded_record_ids,
+        metadata: prepared.metadata.clone(),
+        total_record_count: prepared.total_record_count,
+        excluded_record_count: prepared.excluded_records.len(),
+        excluded_record_ids: prepared
+            .excluded_records
+            .iter()
+            .map(|excluded| excluded.record_id.clone())
+            .collect(),
         top_k,
         selected_ranker,
-        baseline_metrics: metrics_for_selection(
-            corpus,
-            inventory,
-            top_k,
-            RankerSelection::Baseline,
-        ),
-        lexical_prior_metrics: metrics_for_selection(
-            corpus,
-            inventory,
-            top_k,
-            RankerSelection::LexicalPrior,
-        ),
+        baseline_metrics: baseline.metrics,
+        lexical_prior_metrics: lexical_prior.metrics,
         ablations,
         side_by_side,
     }
-}
-
-fn metrics_for_selection(
-    corpus: &ValidatedCorpus,
-    inventory: &LexicalInventory,
-    top_k: usize,
-    selection: RankerSelection,
-) -> MetricSummary {
-    let records: Vec<RecordEvaluation> = corpus
-        .records
-        .iter()
-        .filter(|record| record.gold.status != GoldStatus::InsufficientEvidence)
-        .map(|record| {
-            let accepted: BTreeSet<String> = record
-                .gold
-                .analyses
-                .iter()
-                .map(|analysis| to_atomic(&analysis.atomic))
-                .collect();
-            let ranked = rank_with(
-                &reconstruct_sep(&record.sep.normalized).candidates,
-                inventory,
-                selection,
-            );
-            RecordEvaluation {
-                record_id: record.record_id.clone(),
-                ambiguity_classes: record
-                    .gold
-                    .ambiguity_classes
-                    .iter()
-                    .map(|class| class.as_str().to_owned())
-                    .collect(),
-                accepted_analyses: accepted.into_iter().collect(),
-                candidates: ranked
-                    .into_iter()
-                    .map(|candidate| candidate.atomic)
-                    .collect(),
-            }
-        })
-        .collect();
-    summarize(&records, top_k)
 }
 
 fn ranks(candidates: &[RankedCandidate]) -> BTreeMap<String, &RankedCandidate> {
@@ -443,6 +445,15 @@ impl RankingComparisonReport {
     pub fn to_markdown(&self) -> String {
         let mut output = format!(
             "# Lexical-prior ranking experiment\n\n\
+             - Corpus: `{}` version `{}`\n\
+             - Schema: `{}`\n\
+             - Normalization: `{}`\n\
+             - Repository version: `{}`\n\
+             - Git commit: `{}`\n\
+             - Git working tree clean: `{}`\n\
+             - Run timestamp (UTC): `{}`\n\
+             - Lexical resource: `{}`\n\
+             - Lexical resource checksum: `{}`\n\
              - Lexicon Atomic entries: {}\n\
              - Records: {} total, {} excluded\n\
              - Configured top-k: {}\n\
@@ -453,6 +464,26 @@ impl RankingComparisonReport {
               | Lexical prior (combined) | {} | {} | {} | {} |\n\n\
               ## Ablation metrics\n\n\
              | Ranker | Top-1 | Top-3 | Top-k | Candidate recall (macro) |\n|---|---:|---:|---:|---:|\n",
+            self.metadata.corpus_id,
+            self.metadata.corpus_version,
+            self.metadata.schema_version,
+            self.metadata.normalization_version,
+            self.metadata.repository_version,
+            self.metadata.git_commit.as_deref().unwrap_or("unavailable"),
+            self.metadata
+                .git_working_tree_clean
+                .map(|clean| clean.to_string())
+                .as_deref()
+                .unwrap_or("unavailable"),
+            self.metadata.run_timestamp,
+            self.metadata
+                .lexical_resource_path
+                .as_deref()
+                .unwrap_or("unavailable"),
+            self.metadata
+                .lexical_resource_checksum
+                .as_deref()
+                .unwrap_or("unavailable"),
             self.lexical_entry_count,
             self.total_record_count,
             self.excluded_record_count,
@@ -527,9 +558,10 @@ fn escape(value: &str) -> String {
 mod tests {
     use super::{
         BaselineRanker, LexicalInventory, LexicalPriorRanker, Ranker, RankerSelection,
-        compare_corpus_rankers, compare_corpus_rankers_with_selection, rank_with,
+        compare_corpus_rankers, compare_corpus_rankers_with_selection, compare_prepared_rankers,
+        rank_with,
     };
-    use crate::evaluation::validate_corpus_dir;
+    use crate::evaluation::{prepare_benchmark, validate_corpus_dir};
     use crate::reconstruction::{Candidate, Derivation};
     use std::path::Path;
 
@@ -610,5 +642,23 @@ mod tests {
                 .iter()
                 .all(|candidate| candidate.final_rank == candidate.baseline_rank)
         );
+        let prepared = prepare_benchmark(
+            &corpus,
+            Some((Path::new("lexicon-fixture.txt"), "sha256:fixture")),
+        );
+        let shared = compare_prepared_rankers(&prepared, &inventory, 3, RankerSelection::Baseline);
+        assert_eq!(shared.baseline_metrics, selected.baseline_metrics);
+        assert_eq!(shared.side_by_side, selected.side_by_side);
+        assert_eq!(
+            shared.metadata.lexical_resource_path.as_deref(),
+            Some("lexicon-fixture.txt")
+        );
+        assert_eq!(
+            shared.metadata.lexical_resource_checksum.as_deref(),
+            Some("sha256:fixture")
+        );
+        let json = serde_json::to_value(&shared).expect("report should serialize");
+        assert_eq!(json["corpus_id"], "validator-fixture");
+        assert_eq!(json["lexical_resource_checksum"], "sha256:fixture");
     }
 }

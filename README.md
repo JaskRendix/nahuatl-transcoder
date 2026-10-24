@@ -171,7 +171,7 @@ The command exits successfully only when the manifest and all records validate. 
 
 ### Reconstruction evaluation
 
-The benchmark runner validates the corpus before evaluating each eligible record's normalized SEP form with `reconstruct_sep()`. Generated Atomic candidates are compared with all adjudicated accepted Atomic analyses; any accepted analysis can satisfy ranking accuracy. `insufficient_evidence` records are excluded from accuracy and candidate-set denominators and listed separately. Other statuses with accepted analyses are included.
+Both benchmark CLIs use a shared prepared-corpus pipeline: corpus validation happens once, each eligible record's accepted Atomic analyses are normalized once, and `reconstruct_sep()` runs once per record. Reconstruction evaluation and every ranking ablation then reuse those candidate sets. Any accepted analysis can satisfy ranking accuracy. `insufficient_evidence` records are excluded from accuracy and candidate-set denominators and listed separately. Other statuses with accepted analyses are included.
 
 The report includes top-1, top-3, and configurable top-k accuracy; macro and micro candidate recall and precision; exact-set coverage; unsupported candidate rate; average, median, and maximum candidate-set size; no-candidate, system-ambiguity, unique-candidate, and gold-ambiguity rates; and the same metrics by declared ambiguity class. Undefined ratios are `null` in JSON and `n/a` in Markdown. Candidate absence from an accepted set means unsupported by this annotation, not necessarily linguistically false. Projection matching is included as a diagnostic and is not evidence of an accepted analysis.
 
@@ -201,7 +201,7 @@ cargo run --offline --bin evaluate_ranking -- my-corpus \
   --top-k 3
 ```
 
-The selected ranker determines the report's `final_rank`; the report also retains baseline, lexical-prior, and three ablation metrics, plus each candidate's ranks under all five selections, feature values, baseline heuristic score, and lexical score. The baseline reproduces the existing `Candidate::score()` ordering. The combined score is `100 × lexical_score + heuristic_score`; exact Atomic lexicon matches contribute 2 lexical points and normalized matches contribute 1. Lexical-only ties use Atomic lexical order; baseline and combined ties retain stable candidate order. The lexical resource is a ranking prior, not an independent gold source: report its provenance and overlap with any evaluation sources, and do not interpret results as independent if sources overlap.
+The selected ranker determines the report's `final_rank`; the report also retains baseline, lexical-prior, and three ablation metrics, plus each candidate's ranks under all five selections, feature values, baseline heuristic score, and lexical score. Both reports share corpus, crate, timestamp, and Git metadata; ranking reports additionally record the lexical-resource path and SHA-256 checksum. The resource is loaded and hashed from the same byte snapshot. The baseline reproduces the existing `Candidate::score()` ordering. The combined score is `100 × lexical_score + heuristic_score`; exact Atomic lexicon matches contribute 2 lexical points and normalized matches contribute 1. Lexical-only ties use Atomic lexical order; baseline and combined ties retain stable candidate order. The lexical resource is a ranking prior, not an independent gold source: report its provenance and overlap with any evaluation sources, and do not interpret results as independent if sources overlap.
 
 ## Architecture
 

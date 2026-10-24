@@ -13,8 +13,8 @@ fn evaluates_valid_fixture_and_reports_reconstruction_candidates() {
     let corpus = validate_corpus_dir(fixture("valid_corpus")).expect("fixture should validate");
     let report = evaluate_corpus(&corpus, 2);
 
-    assert_eq!(report.corpus_id, "validator-fixture");
-    assert_eq!(report.corpus_version, "0.1.0");
+    assert_eq!(report.metadata.corpus_id, "validator-fixture");
+    assert_eq!(report.metadata.corpus_version, "0.1.0");
     assert_eq!(report.configured_top_k, 2);
     assert_eq!(report.total_record_count, 1);
     assert_eq!(report.metrics.record_count, 1);
