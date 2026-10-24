@@ -151,7 +151,7 @@ These are diagnostics over the bundled lexicon, not an independently annotated e
 
 ### Evaluation corpus validation
 
-The offline validator checks a corpus directory containing a `manifest.json` and a `records.jsonl` file. Its serde-based schema and validation rules are implemented in `src/evaluation/`; it does not fetch sources or evaluate reconstruction metrics.
+The offline validator checks a corpus directory containing a `manifest.json` and a `records.jsonl` file. Its serde-based schema and validation rules are implemented in `src/evaluation/`; it does not fetch sources.
 
 ```text
 my-corpus/
@@ -169,6 +169,24 @@ cargo run --offline --bin validate_evaluation_corpus -- my-corpus
 
 The command exits successfully only when the manifest and all records validate. Errors include the record identifier (or manifest/line marker), field path, and a human-readable explanation. All validation is local and offline.
 
+### Reconstruction evaluation
+
+The benchmark runner validates the corpus before evaluating each eligible record's normalized SEP form with `reconstruct_sep()`. Generated Atomic candidates are compared with all adjudicated accepted Atomic analyses; any accepted analysis can satisfy ranking accuracy. `insufficient_evidence` records are excluded from accuracy and candidate-set denominators and listed separately. Other statuses with accepted analyses are included.
+
+The report includes top-1, top-3, and configurable top-k accuracy; macro and micro candidate recall and precision; exact-set coverage; unsupported candidate rate; average, median, and maximum candidate-set size; no-candidate, system-ambiguity, unique-candidate, and gold-ambiguity rates; and the same metrics by declared ambiguity class. Undefined ratios are `null` in JSON and `n/a` in Markdown. Candidate absence from an accepted set means unsupported by this annotation, not necessarily linguistically false. Projection matching is included as a diagnostic and is not evidence of an accepted analysis.
+
+Run from the repository root. Both report paths are explicit; top-k defaults to 3:
+
+```bash
+mkdir -p results
+cargo run --offline --bin evaluate_reconstruction -- my-corpus \
+  --json results/baseline.json \
+  --markdown results/baseline.md \
+  --top-k 5
+```
+
+The machine-readable and Markdown reports include corpus/schema/normalization versions, run time, repository version, Git commit and working-tree cleanliness when available, metric definitions, record and exclusion counts, ambiguity-class metrics, and each record's ordered candidates, scores, derivations, projections, and accepted-analysis matches. The evaluator is deterministic for a fixed corpus and code revision except for run timestamp and repository-state metadata. It is offline-only and does not modify reconstruction or ranking behavior.
+
 ## Architecture
 
 The conversion pipeline normalizes input to Atomic, then renders orthographic or phonetic outputs. `convert_all()` produces SEP and Hasler from the M→F result; the other returned forms are rendered from Atomic. SEP reconstruction is a separate inverse-candidate process and does not change the forward conversion pipeline.
@@ -184,8 +202,8 @@ The main modules are:
 * `phonetics.rs`: degemination, syllabification, stress marking, phonetic IPA, and search forms.
 * `geminate.rs` and `en_endings.rs`: implemented lexical gemination patterns and final-`n`/`h` exceptions used by the phonological helpers.
 * `metaword.rs`: punctuation handling, metadata tags, name/deity lists, and locative-suffix classification.
-* `evaluation/`: serde corpus structures and offline corpus validation.
-* `src/bin/`: the `c2m` converter, three lexicon reconstruction diagnostics, and the evaluation-corpus validator.
+* `evaluation/`: serde corpus structures, offline validation, set-valued reconstruction metrics, benchmark execution, and JSON/Markdown reporting.
+* `src/bin/`: the `c2m` converter, three lexicon reconstruction diagnostics, the corpus validator, and the benchmark runner.
 
 ## Project layout
 
@@ -200,7 +218,6 @@ The main modules are:
 ├── README.md
 ├── docs/
 │   ├── lexical_ambiguities.md
-│   ├── independent-reconstruction-evaluation.md
 │   ├── reconstruction-evaluation.md
 │   ├── trager-phonology-notes-es.md
 │   └── trager-phonology-reference.md
@@ -213,6 +230,14 @@ The main modules are:
 │   ├── atomic.rs
 │   ├── constants.rs
 │   ├── en_endings.rs
+│   ├── evaluation/
+│   │   ├── benchmark.rs
+│   │   ├── errors.rs
+│   │   ├── metrics.rs
+│   │   ├── mod.rs
+│   │   ├── report.rs
+│   │   ├── schema.rs
+│   │   └── validation.rs
 │   ├── geminate.rs
 │   ├── lib.rs
 │   ├── main.rs
@@ -227,19 +252,16 @@ The main modules are:
 │   │   ├── reconstruction_coverage.rs
 │   │   ├── reconstruction_metrics.rs
 │   │   ├── reconstruction_ranking.rs
+│   │   ├── evaluate_reconstruction.rs
 │   │   └── validate_evaluation_corpus.rs
 │   ├── data/
 │   │   ├── deities.txt
 │   │   ├── g2.nfc.txt
 │   │   ├── given_names.txt
 │   │   └── surnames.txt
-│   └── evaluation/
-│       ├── errors.rs
-│       ├── mod.rs
-│       ├── schema.rs
-│       └── validation.rs
 └── tests/
     ├── evaluation.rs
+    ├── evaluation_benchmark.rs
     ├── golden.rs
     ├── metaword.rs
     ├── reconstruction_cases.rs
