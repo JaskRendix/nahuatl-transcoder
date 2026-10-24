@@ -130,6 +130,28 @@ pub fn reconstruct_sep(input: &str) -> CandidateSet {
                 Derivation::KLenitionRecovery,
                 &observed,
             );
+
+            if let Some(final_w) = recover_final_w(k_recovery) {
+                add_candidate(
+                    &mut candidates,
+                    final_w,
+                    Derivation::FinalWRecovery,
+                    &observed,
+                );
+            }
+
+            for coda_w in recover_coda_w(k_recovery) {
+                add_candidate(
+                    &mut candidates,
+                    coda_w,
+                    Derivation::CodaWRecovery,
+                    &observed,
+                );
+            }
+
+            for ll in recover_ll_from_hl(k_recovery) {
+                add_candidate(&mut candidates, ll, Derivation::LlHlRecovery, &observed);
+            }
         }
 
         let mut kw_recovery_seeds = vec![(observed.clone(), false)];
@@ -699,5 +721,31 @@ mod tests {
         let result = reconstruct_sep("kuajmajmāntli");
 
         assert!(result.candidates.iter().any(|c| c.atomic == "κawmahmānλi"));
+    }
+
+    #[test]
+    fn regression_icxipetziquiuh() {
+        let result = reconstruct_sep("ijxipetsikij");
+
+        assert!(result.candidates.iter().any(|c| c.atomic == "ikxipeτikiw"));
+    }
+
+    #[test]
+    fn regression_icxipetziquiuhtic() {
+        let result = reconstruct_sep("ijxipetsikijtik");
+
+        assert!(
+            result
+                .candidates
+                .iter()
+                .any(|c| c.atomic == "ikxipeτikiwtik")
+        );
+    }
+
+    #[test]
+    fn regression_icxopilli() {
+        let result = reconstruct_sep("ijxopijli");
+
+        assert!(result.candidates.iter().any(|c| c.atomic == "ikxopilli"));
     }
 }
