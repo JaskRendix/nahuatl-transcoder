@@ -2,7 +2,6 @@ pub mod abugida;
 pub mod allophones;
 pub mod atomic;
 pub mod constants;
-pub mod evaluation;
 pub mod geminate;
 pub mod metaword;
 pub mod orthography;
