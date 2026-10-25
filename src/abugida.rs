@@ -1,7 +1,7 @@
 use crate::constants::*;
 
 pub fn atomic_to_abugida(input: &str) -> String {
-    let mut out = String::new();
+    let mut out = String::with_capacity(input.len());
 
     for ch in input.chars() {
         match ch {
@@ -11,24 +11,16 @@ pub fn atomic_to_abugida(input: &str) -> String {
             'o' => out.push(VOWEL_O),
             'u' => out.push(VOWEL_U),
 
-            'ā' => {
-                out.push(VOWEL_A);
-                out.push(LONG_VOWEL_SIGN);
-            }
-            'ē' => {
-                out.push(VOWEL_E);
-                out.push(LONG_VOWEL_SIGN);
-            }
-            'ī' => {
-                out.push(VOWEL_I);
-                out.push(LONG_VOWEL_SIGN);
-            }
-            'ō' => {
-                out.push(VOWEL_O);
-                out.push(LONG_VOWEL_SIGN);
-            }
-            'ū' => {
-                out.push(VOWEL_U);
+            'ā' | 'ē' | 'ī' | 'ō' | 'ū' => {
+                let base = match ch {
+                    'ā' => VOWEL_A,
+                    'ē' => VOWEL_E,
+                    'ī' => VOWEL_I,
+                    'ō' => VOWEL_O,
+                    'ū' => VOWEL_U,
+                    _ => unreachable!(),
+                };
+                out.push(base);
                 out.push(LONG_VOWEL_SIGN);
             }
 
