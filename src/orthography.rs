@@ -158,104 +158,77 @@ fn map_ipa(ch: char) -> Option<&'static str> {
     })
 }
 
-pub fn atomic_to_sep(input: &str) -> String {
+/// Helper to drive simple character-by-character mapping functions.
+fn transliterate<F>(input: &str, map_fn: F) -> String
+where
+    F: Fn(char) -> Option<&'static str>,
+{
     let mut out = String::new();
-
     for ch in input.chars() {
-        match map_sep(ch) {
+        match map_fn(ch) {
             Some(m) => out.push_str(m),
             None => out.push(ch),
         }
     }
-
     out
+}
+
+pub fn atomic_to_sep(input: &str) -> String {
+    transliterate(input, map_sep)
 }
 
 pub fn atomic_to_hasler(input: &str) -> String {
-    let mut out = String::new();
-
-    for ch in input.chars() {
-        match map_hasler(ch) {
-            Some(m) => out.push_str(m),
-            None => out.push(ch),
-        }
-    }
-
-    out
+    transliterate(input, map_hasler)
 }
 
 pub fn atomic_to_ipa(input: &str) -> String {
-    let mut out = String::new();
-
-    for ch in input.chars() {
-        match map_ipa(ch) {
-            Some(m) => out.push_str(m),
-            None => out.push(ch),
-        }
-    }
-
-    out
+    transliterate(input, map_ipa)
 }
 
 pub fn atomic_to_ack(input: &str) -> String {
     let chars: Vec<char> = input.chars().collect();
-
     let mut out = String::new();
 
     for i in 0..chars.len() {
         let current = chars[i];
-
         let prev = if i > 0 { chars[i - 1] } else { ' ' };
-
         let next = if i + 1 < chars.len() {
             chars[i + 1]
         } else {
             ' '
         };
 
-        //
         // w -> hu / uh
-        //
         if current == 'w' && is_atomic_vowel(prev) && !is_atomic_vowel(next) {
             out.push_str("uh");
             continue;
         }
 
-        //
         // κ -> cu / uc
-        //
         if current == 'κ' && is_atomic_vowel(prev) && !is_atomic_vowel(next) {
             out.push_str("uc");
             continue;
         }
 
-        //
         // k before e/i
-        //
         if current == 'k' && matches!(next, 'e' | 'i' | 'ē' | 'ī') {
             out.push_str("qu");
             continue;
         }
 
-        //
         // s before e/i
-        //
         if current == 's' && matches!(next, 'e' | 'i' | 'ē' | 'ī') {
             out.push('c');
             continue;
         }
 
-        //
         // k before a/o
-        //
         if current == 'k' {
             out.push('c');
             continue;
         }
 
-        //
         // s before a/o
-        //
         if current == 's' {
             out.push('z');
             continue;
