@@ -1,5 +1,13 @@
+//! Abugida shaping and syllable-structure processing.
+//!
+//! This module transforms a linear sequence of abugida
+//! characters into its structured form by applying vowel-sign,
+//! subjoiner, and compound-vowel rules.
+
 use crate::constants::*;
 
+/// Length of the V-U-V pattern used when detecting
+/// ambiguous intervocalic /u/ realizations.
 const VUV_PATTERN_LENGTH: usize = 3;
 
 fn is_consonant(ch: char) -> bool {
@@ -64,6 +72,16 @@ fn vowel_to_vowel_sign(ch: char) -> char {
     }
 }
 
+/// Converts a linear abugida character stream into its
+/// structured representation.
+///
+/// Processing consists of:
+///
+/// - V-U-V normalization (VUV → VWA V)
+/// - consonant-vowel shaping
+/// - consonant cluster marking with subjoiners
+/// - compound-vowel formation
+/// - removal of redundant vowel signs
 pub fn structure(input: &str) -> String {
     let mut elem: Vec<char> = input.chars().collect();
 
