@@ -3,11 +3,58 @@ use regex::Regex;
 
 use crate::en_endings::ends_in_en;
 
+// Prefixes participating in the hk(i|eh) -> wk(i|eh) alternation.
+static HK2WK_PREFIXES: &[&str] = &[
+    "ala",
+    "kana",
+    "ka",
+    "se",
+    "ςipa",
+    "ςi",
+    "ςo",
+    "sia",
+    "si",
+    "ko",
+    "κahκa",
+    "κite",
+    "e",
+    "wapa",
+    "itonalpote",
+    "li",
+    "lo",
+    "ma",
+    "maxihxiλa",
+    "mela",
+    "me",
+    "mole",
+    "ne",
+    "ni",
+    "paλa",
+    "pe",
+    "pina",
+    "piτa",
+    "pohye",
+    "poke",
+    "po",
+    "ki",
+    "tila",
+    "λaxλa",
+    "λiκeti",
+    "τa",
+    "τi",
+    "xa",
+    "xiλa",
+    "xi",
+    "ya",
+    "yo",
+    "sa",
+    "soλa",
+    "so",
+];
+
 static HK2WK: Lazy<Regex> = Lazy::new(|| {
-    Regex::new(
-        r"(ala|kana|ka|se|ςipa|ςi|ςo|sia|si|ko|κahκa|κite|e|wapa|itonalpote|li|lo|ma|maxihxiλa|mela|me|mole|ne|ni|paλa|pe|pina|piτa|pohye|poke|po|ki|tila|λaxλa|λiκeti|τa|τi|xa|xiλa|xi|ya|yo|sa|soλa|so)hk(i|eh)$"
-    )
-    .unwrap()
+    let pattern = format!("({})hk(i|eh)$", HK2WK_PREFIXES.join("|"));
+    Regex::new(&pattern).unwrap()
 });
 
 pub fn hk2wk(word: &str) -> String {
@@ -30,58 +77,43 @@ pub fn h2w(word: &str) -> String {
     }
 }
 
+// Exception lists for suffix transformations
+const TZIH_EXCEPTIONS: &[&str] = &["τahτih", "weτih"];
+const SECIH_EXCEPTIONS: &[&str] = &["leςih", "peςih"];
+const LIH_EXCEPTIONS: &[&str] = &["kikilih"];
+
+// Order matters. Replacements are applied sequentially and later
+// rules operate on the result of earlier rules.
+const NOCE_REPLACEMENTS: &[(&str, &str)] = &[
+    ("iniwah", "inihwan"),
+    ("iniwantih", "inihwantin"),
+    ("inmowah", "inmohwan"),
+    ("inmowantih", "inmohwantin"),
+    ("towah", "tohwan"),
+    ("towantih", "tohwantin"),
+];
+
+fn apply_suffix_unless(w: &mut String, suffix: &str, replacement: &str, exceptions: &[&str]) {
+    if !exceptions.iter().any(|&ex| w.ends_with(ex))
+        && let Some(stem) = w.strip_suffix(suffix)
+    {
+        *w = format!("{stem}{replacement}");
+    }
+}
+
 pub fn h2n(word: &str) -> String {
     let mut w = word.to_string();
 
-    //
-    // τih -> τin
-    //
+    apply_suffix_unless(&mut w, "τih", "τin", TZIH_EXCEPTIONS);
+    apply_suffix_unless(&mut w, "ςih", "ςin", SECIH_EXCEPTIONS);
+    apply_suffix_unless(&mut w, "lih", "lin", LIH_EXCEPTIONS);
 
-    if !w.ends_with("τahτih")
-        && !w.ends_with("weτih")
-        && let Some(stem) = w.strip_suffix("τih")
-    {
-        w = format!("{stem}τin");
-    }
-
-    //
-    // ςih -> ςin
-    //
-
-    if !w.ends_with("leςih")
-        && !w.ends_with("peςih")
-        && let Some(stem) = w.strip_suffix("ςih")
-    {
-        w = format!("{stem}ςin");
-    }
-
-    //
-    // lih -> lin
-    //
-
-    if !w.ends_with("kikilih")
-        && let Some(stem) = w.strip_suffix("lih")
-    {
-        w = format!("{stem}lin");
-    }
-
-    //
     // Explicit exceptions from NOCE
-    //
+    for (from, to) in NOCE_REPLACEMENTS {
+        w = w.replace(from, to);
+    }
 
-    w = w.replace("iniwah", "inihwan");
-    w = w.replace("iniwantih", "inihwantin");
-
-    w = w.replace("inmowah", "inmohwan");
-    w = w.replace("inmowantih", "inmohwantin");
-
-    w = w.replace("towah", "tohwan");
-    w = w.replace("towantih", "tohwantin");
-
-    //
     // en_endings.js
-    //
-
     if ends_in_en(&w) && w.ends_with('h') {
         w.pop();
         w.push('n');
