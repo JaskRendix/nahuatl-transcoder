@@ -4,6 +4,8 @@ pub const ATOMIC_VOWELS: &str = "aeioāēīōuū";
 
 pub const ATOMIC_CONSONANTS: &str = "mnptkκτλςsxhlwyñβdgfrρbv";
 
+pub const FOREIGN_CONSONANTS: &str = "ñβdgfrρbv";
+
 pub const ATOMIC_KW: char = 'κ';
 pub const ATOMIC_TS: char = 'τ';
 pub const ATOMIC_TL: char = 'λ';
@@ -23,7 +25,7 @@ pub fn is_atomic_letter(ch: char) -> bool {
 }
 
 pub fn is_foreign_consonant(ch: char) -> bool {
-    matches!(ch, 'ñ' | 'β' | 'd' | 'g' | 'f' | 'r' | 'ρ' | 'b' | 'v')
+    FOREIGN_CONSONANTS.contains(ch)
 }
 
 pub fn to_unmarked_vowel(ch: char) -> char {
