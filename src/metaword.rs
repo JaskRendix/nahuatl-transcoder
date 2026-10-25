@@ -31,40 +31,27 @@ const PREFIX_PUNCTUATION: &str =
 
 const POSTFIX_PUNCTUATION: &str = "\n\r.,—–‒/#!¡$%^&*;:=-_`~@+?¿(){}<>[]+\"“”«»‘’‛‹›…'";
 
+fn load_word_set(content: &'static str) -> HashSet<&'static str> {
+    content
+        .lines()
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+        .collect()
+}
+
 fn given_names() -> &'static HashSet<&'static str> {
     static NAMES: OnceLock<HashSet<&'static str>> = OnceLock::new();
-
-    NAMES.get_or_init(|| {
-        include_str!("data/given_names.txt")
-            .lines()
-            .map(str::trim)
-            .filter(|s| !s.is_empty())
-            .collect()
-    })
+    NAMES.get_or_init(|| load_word_set(include_str!("data/given_names.txt")))
 }
 
 fn surnames() -> &'static HashSet<&'static str> {
     static NAMES: OnceLock<HashSet<&'static str>> = OnceLock::new();
-
-    NAMES.get_or_init(|| {
-        include_str!("data/surnames.txt")
-            .lines()
-            .map(str::trim)
-            .filter(|s| !s.is_empty())
-            .collect()
-    })
+    NAMES.get_or_init(|| load_word_set(include_str!("data/surnames.txt")))
 }
 
 fn deities() -> &'static HashSet<&'static str> {
     static DEITIES: OnceLock<HashSet<&'static str>> = OnceLock::new();
-
-    DEITIES.get_or_init(|| {
-        include_str!("data/deities.txt")
-            .lines()
-            .map(str::trim)
-            .filter(|s| !s.is_empty())
-            .collect()
-    })
+    DEITIES.get_or_init(|| load_word_set(include_str!("data/deities.txt")))
 }
 
 pub fn is_given_name(name: &str) -> bool {
@@ -79,7 +66,6 @@ pub fn is_family_name(name: &str) -> bool {
 
 pub fn is_proper_name(name: &str) -> bool {
     let name = name.to_lowercase();
-
     given_names().contains(name.as_str()) || surnames().contains(name.as_str())
 }
 
@@ -89,7 +75,6 @@ pub fn is_deity(name: &str) -> bool {
 
 pub fn segregate_punctuation(input: &str) -> (String, String, String) {
     let chars: Vec<char> = input.chars().collect();
-
     let mut i = 0;
 
     let mut prefix = String::new();
@@ -145,7 +130,10 @@ pub fn split_to_metawords(input: &str) -> Vec<MetaWord> {
         let mut deity_name = prefixed.contains(TAG_DEITY_NAME);
 
         prefixed.retain(|c| {
-            c != TAG_IMMUTABLE && c != TAG_PROPER_NAME && c != TAG_PLACE_NAME && c != TAG_DEITY_NAME
+            !matches!(
+                c,
+                TAG_IMMUTABLE | TAG_PROPER_NAME | TAG_PLACE_NAME | TAG_DEITY_NAME
+            )
         });
 
         let atomic = to_atomic(&word.to_lowercase());
