@@ -1,18 +1,36 @@
+//! Re-gemination rules for reconstructing morphophonemic forms.
+//!
+//! Many phonetic orthographies omit consonant gemination.
+//! This module applies a collection of heuristic rules to
+//! restore common geminated consonants in ATOMIC orthography.
+//!
+//! The rules are intentionally incomplete and are based on
+//! lexical patterns observed in Nahuatl dictionaries and
+//! corpora. Because the process is heuristic, manual review
+//! may still be necessary.
+
 use once_cell::sync::Lazy;
 use regex::Regex;
 
+/// Source representation of a re-gemination rule.
 struct GemRule {
     pattern: &'static str,
     replacement: &'static str,
     exclude: Option<&'static str>,
 }
 
+/// Regex-compiled form of a re-gemination rule.
 struct CompiledGemRule {
     pattern: Regex,
     replacement: &'static str,
     exclude: Option<Regex>,
 }
 
+/// Ordered re-gemination rules.
+///
+/// Rules are applied sequentially. Some rules target whole
+/// words, while others target productive suffix patterns.
+/// Optional exclusion patterns prevent false positives.
 const RAW_RULES: &[GemRule] = &[
     // M
     GemRule {
@@ -130,6 +148,10 @@ const RAW_RULES: &[GemRule] = &[
     },
 ];
 
+/// Lazily compiled version of `RAW_RULES`.
+///
+/// Compiling regular expressions once avoids repeated
+/// regex construction during gemination.
 static RULES: Lazy<Vec<CompiledGemRule>> = Lazy::new(|| {
     RAW_RULES
         .iter()
@@ -141,6 +163,14 @@ static RULES: Lazy<Vec<CompiledGemRule>> = Lazy::new(|| {
         .collect()
 });
 
+/// Restores geminated consonants using a sequence of
+/// heuristic lexical and morphological rules.
+///
+/// This function is intended to operate on individual
+/// words represented in ATOMIC orthography.
+///
+/// Exclusion patterns are checked before each rule is
+/// applied to reduce false-positive matches.
 pub fn geminate(input: &str) -> String {
     let mut result = input.to_string();
 
