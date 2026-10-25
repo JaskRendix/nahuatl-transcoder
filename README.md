@@ -217,7 +217,7 @@ The main modules are:
 * `reconstruction.rs`: candidate generation, forward projection validation, deduplication, derivation tracking, and heuristic ordering.
 * `ranking.rs`: baseline and lexical-prior rankers plus deterministic ranking ablations; this module reorders generated candidates without changing reconstruction.
 * `phonetics.rs`: degemination, syllabification, stress marking, phonetic IPA, and search forms.
-* `geminate.rs` and `en_endings.rs`: implemented lexical gemination patterns and final-`n`/`h` exceptions used by the phonological helpers.
+* `geminate.rs`: implemented lexical gemination patterns and final-`n`/`h` exceptions used by the phonological helpers.
 * `metaword.rs`: punctuation handling, metadata tags, name/deity lists, and locative-suffix classification.
 * `evaluation/`: serde corpus structures, offline validation, set-valued reconstruction metrics, benchmark execution, and JSON/Markdown reporting.
 * `src/bin/`: the `c2m` converter, three lexicon reconstruction diagnostics, the corpus validator, and the benchmark runner.
@@ -246,7 +246,6 @@ The main modules are:
 │   ├── allophones.rs
 │   ├── atomic.rs
 │   ├── constants.rs
-│   ├── en_endings.rs
 │   ├── evaluation/
 │   │   ├── benchmark.rs
 │   │   ├── errors.rs
