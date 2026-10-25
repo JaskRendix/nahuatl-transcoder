@@ -35,57 +35,34 @@ pub fn get_trager_to_atomic_rules() -> &'static [(String, &'static str)] {
         let mut rules = Vec::new();
 
         // 1. Diphthong & complex vowel signs following consonants
-        for &(c, base) in &consonants {
-            rules.push((
-                format!("{}{}", c, nab::VOWEL_SIGN_IA),
-                Box::leak(format!("{}ia", base).into_boxed_str()) as &str,
-            ));
-        }
-        for &(c, base) in &consonants {
-            rules.push((
-                format!("{}{}", c, nab::VOWEL_SIGN_AI),
-                Box::leak(format!("{}ai", base).into_boxed_str()) as &str,
-            ));
-        }
-        for &(c, base) in &consonants {
-            rules.push((
-                format!("{}{}", c, nab::VOWEL_SIGN_OA),
-                Box::leak(format!("{}oa", base).into_boxed_str()) as &str,
-            ));
-        }
-        for &(c, base) in &consonants {
-            rules.push((
-                format!("{}{}", c, nab::VOWEL_SIGN_EO),
-                Box::leak(format!("{}eo", base).into_boxed_str()) as &str,
-            ));
-        }
-        for &(c, base) in &consonants {
-            rules.push((
-                format!("{}{}", c, nab::VOWEL_SIGN_EI),
-                Box::leak(format!("{}ei", base).into_boxed_str()) as &str,
-            ));
-        }
-        for &(c, base) in &consonants {
-            rules.push((
-                format!("{}{}", c, nab::VOWEL_SIGN_IO),
-                Box::leak(format!("{}io", base).into_boxed_str()) as &str,
-            ));
-        }
-        for &(c, base) in &consonants {
-            rules.push((
-                format!("{}{}", c, nab::VOWEL_SIGN_AO),
-                Box::leak(format!("{}ao", base).into_boxed_str()) as &str,
-            ));
+        const COMPOUND_VOWEL_SIGNS: &[(&str, char)] = &[
+            ("ia", nab::VOWEL_SIGN_IA),
+            ("ai", nab::VOWEL_SIGN_AI),
+            ("oa", nab::VOWEL_SIGN_OA),
+            ("eo", nab::VOWEL_SIGN_EO),
+            ("ei", nab::VOWEL_SIGN_EI),
+            ("io", nab::VOWEL_SIGN_IO),
+            ("ao", nab::VOWEL_SIGN_AO),
+        ];
+
+        for &(suffix, vs) in COMPOUND_VOWEL_SIGNS {
+            for &(c, base) in &consonants {
+                rules.push((
+                    format!("{}{}", c, vs),
+                    Box::leak(format!("{}{}", base, suffix).into_boxed_str()) as &str,
+                ));
+            }
         }
 
         // 2. Standard vowel signs (E, I, O, U) following consonants
-        let vowel_signs = [
-            (nab::VOWEL_SIGN_E, "e"),
-            (nab::VOWEL_SIGN_I, "i"),
-            (nab::VOWEL_SIGN_O, "o"),
-            (nab::VOWEL_SIGN_U, "u"),
+        const VOWEL_SIGNS: &[(&str, char)] = &[
+            ("e", nab::VOWEL_SIGN_E),
+            ("i", nab::VOWEL_SIGN_I),
+            ("o", nab::VOWEL_SIGN_O),
+            ("u", nab::VOWEL_SIGN_U),
         ];
-        for &(vs, v_str) in &vowel_signs {
+
+        for &(v_str, vs) in VOWEL_SIGNS {
             for &(c, base) in &consonants {
                 rules.push((
                     format!("{}{}", c, vs),
@@ -103,11 +80,6 @@ pub fn get_trager_to_atomic_rules() -> &'static [(String, &'static str)] {
         }
 
         // 4. Long intrinsic-A vowels on consonant bases
-        //
-        // CONSONANT_MA + LONG_VOWEL_SIGN -> mā
-        // CONSONANT_NA + LONG_VOWEL_SIGN -> nā
-        // etc.
-        //
         for &(c, base) in &consonants {
             rules.push((
                 format!("{}{}", c, nab::LONG_VOWEL_SIGN),
@@ -131,7 +103,7 @@ pub fn get_trager_to_atomic_rules() -> &'static [(String, &'static str)] {
             format!("{}{}", nab::VOWEL_SIGN_A, nab::LONG_VOWEL_SIGN),
             "ā",
         ));
-        for &(vs, v_str) in &vowel_signs {
+        for &(v_str, vs) in VOWEL_SIGNS {
             let lv = match v_str {
                 "e" => "ē",
                 "i" => "ī",
@@ -143,26 +115,26 @@ pub fn get_trager_to_atomic_rules() -> &'static [(String, &'static str)] {
         }
 
         // 5. Short or Unmarked Vowels & Vowel Signs
-        rules.push((nab::VOWEL_A.to_string(), "a"));
-        rules.push((nab::VOWEL_E.to_string(), "e"));
-        rules.push((nab::VOWEL_I.to_string(), "i"));
-        rules.push((nab::VOWEL_O.to_string(), "o"));
-        rules.push((nab::VOWEL_U.to_string(), "u"));
+        for &v in &vowels {
+            let base_str = match v {
+                nab::VOWEL_A => "a",
+                nab::VOWEL_E => "e",
+                nab::VOWEL_I => "i",
+                nab::VOWEL_O => "o",
+                nab::VOWEL_U => "u",
+                _ => unreachable!(),
+            };
+            rules.push((v.to_string(), base_str));
+        }
 
-        rules.push((nab::VOWEL_SIGN_A.to_string(), "a"));
-        rules.push((nab::VOWEL_SIGN_E.to_string(), "e"));
-        rules.push((nab::VOWEL_SIGN_I.to_string(), "i"));
-        rules.push((nab::VOWEL_SIGN_O.to_string(), "o"));
-        rules.push((nab::VOWEL_SIGN_U.to_string(), "u"));
+        for &(v_str, vs) in VOWEL_SIGNS {
+            rules.push((vs.to_string(), v_str));
+        }
 
         // 6. Compound (Diphthong) Vowel Signs standalone
-        rules.push((nab::VOWEL_SIGN_IA.to_string(), "ia"));
-        rules.push((nab::VOWEL_SIGN_AI.to_string(), "ai"));
-        rules.push((nab::VOWEL_SIGN_OA.to_string(), "oa"));
-        rules.push((nab::VOWEL_SIGN_EO.to_string(), "eo"));
-        rules.push((nab::VOWEL_SIGN_EI.to_string(), "ei"));
-        rules.push((nab::VOWEL_SIGN_IO.to_string(), "io"));
-        rules.push((nab::VOWEL_SIGN_AO.to_string(), "ao"));
+        for &(suffix, vs) in COMPOUND_VOWEL_SIGNS {
+            rules.push((vs.to_string(), suffix));
+        }
 
         // 7. Native Consonants with Intrinsic Vowel A (Single character)
         for &(c, base) in &consonants {
@@ -199,23 +171,12 @@ pub fn trager_to_atomic(input: &str) -> String {
 
 fn trager_base(ch: char) -> char {
     match ch {
-        // vowels
-        'a' => nab::VOWEL_A,
-        'e' => nab::VOWEL_E,
-        'i' => nab::VOWEL_I,
-        'o' => nab::VOWEL_O,
-        'u' => nab::VOWEL_U,
+        'a' | 'ā' => nab::VOWEL_A,
+        'e' | 'ē' => nab::VOWEL_E,
+        'i' | 'ī' => nab::VOWEL_I,
+        'o' | 'ō' => nab::VOWEL_O,
+        'u' | 'ū' => nab::VOWEL_U,
 
-        // long vowels
-        // NOTE: these are handled elsewhere in atomic_to_trager(),
-        // so reaching these is usually a bug.
-        'ā' => nab::VOWEL_A,
-        'ē' => nab::VOWEL_E,
-        'ī' => nab::VOWEL_I,
-        'ō' => nab::VOWEL_O,
-        'ū' => nab::VOWEL_U,
-
-        // native consonants
         'm' => nab::CONSONANT_MA,
         'n' => nab::CONSONANT_NA,
         'p' => nab::CONSONANT_PA,
@@ -232,7 +193,6 @@ fn trager_base(ch: char) -> char {
         'y' => nab::CONSONANT_YA,
         'w' => nab::CONSONANT_WA,
 
-        // foreign consonants
         'ñ' => nab::CONSONANT_NYA,
         'β' | 'b' | 'v' => nab::CONSONANT_BVA,
         'd' => nab::CONSONANT_DA,
@@ -293,34 +253,27 @@ pub fn atomic_to_trager(input: &str) -> String {
         {
             match current {
                 'a' => {}
-
                 'ā' => out.push(nab::LONG_VOWEL_SIGN),
-
                 'e' => out.push(nab::VOWEL_SIGN_E),
                 'i' => out.push(nab::VOWEL_SIGN_I),
                 'o' => out.push(nab::VOWEL_SIGN_O),
                 'u' => out.push(nab::VOWEL_SIGN_U),
-
                 'ē' => {
                     out.push(nab::VOWEL_SIGN_E);
                     out.push(nab::LONG_VOWEL_SIGN);
                 }
-
                 'ī' => {
                     out.push(nab::VOWEL_SIGN_I);
                     out.push(nab::LONG_VOWEL_SIGN);
                 }
-
                 'ō' => {
                     out.push(nab::VOWEL_SIGN_O);
                     out.push(nab::LONG_VOWEL_SIGN);
                 }
-
                 'ū' => {
                     out.push(nab::VOWEL_SIGN_U);
                     out.push(nab::LONG_VOWEL_SIGN);
                 }
-
                 _ => {}
             }
         }
@@ -359,12 +312,10 @@ pub fn atomic_to_trager(input: &str) -> String {
                     out.push(sign);
                 } else {
                     if unmarked_vowel(previous) == previous {
-                        // previous was short vowel:
-                        // remove the previous vowel sign
+                        // previous was short vowel: remove the previous vowel sign
                         out.pop();
                     } else {
-                        // previous was long vowel:
-                        // remove vowel sign + LONG_VOWEL_SIGN
+                        // previous was long vowel: remove vowel sign + LONG_VOWEL_SIGN
                         out.pop();
                         out.pop();
                     }
