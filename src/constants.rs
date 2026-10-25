@@ -1,8 +1,23 @@
-// src/constants.rs
+//! Constants defining the Nahuatl Abugida (NAB) character set.
+//!
+//! The NAB script is encoded in the Unicode Private Use Area
+//! and consists of:
+//!
+//! - independent vowels
+//! - vowel signs
+//! - compound vowel signs
+//! - a long-vowel marker
+//! - consonant letters
+//! - classification prefixes
+//! - shaping markers such as the subjoiner
+//!
+//! These constants form the canonical internal representation
+//! used by abugida conversion and shaping modules.
 
+/// Nahuatl Abugida (NAB) code points.
 pub mod nab {
     //
-    // Vowels
+    // Independent vowels
     //
     pub const VOWEL_A: char = '\u{ED90}';
     pub const VOWEL_E: char = '\u{ED91}';
@@ -11,12 +26,12 @@ pub mod nab {
     pub const VOWEL_U: char = '\u{ED94}';
 
     //
-    // Long vowel sign
+    // Long vowel marker
     //
     pub const LONG_VOWEL_SIGN: char = '\u{ED95}';
 
     //
-    // Vowel signs
+    // Dependent vowel signs
     //
     pub const VOWEL_SIGN_A: char = '\u{EDA0}';
     pub const VOWEL_SIGN_E: char = '\u{EDA1}';
@@ -25,7 +40,7 @@ pub mod nab {
     pub const VOWEL_SIGN_U: char = '\u{EDA4}';
 
     //
-    // Compound vowel signs
+    // Compound vowel signs used during shaping
     //
     pub const VOWEL_SIGN_IA: char = '\u{EDA5}';
     pub const VOWEL_SIGN_AI: char = '\u{EDA6}';
@@ -37,14 +52,14 @@ pub mod nab {
     pub const VOWEL_SIGN_AO: char = '\u{EDAC}';
 
     //
-    // Special prefixes
+    // Entity-classification prefixes
     //
     pub const PREFIX_PLACE: char = '\u{EDAD}';
     pub const PREFIX_NAME: char = '\u{EDAE}';
     pub const PREFIX_DEITY: char = '\u{EDAF}';
 
     //
-    // Native consonants
+    // Native Nahuatl consonants
     //
     pub const CONSONANT_MA: char = '\u{EDB0}';
     pub const CONSONANT_NA: char = '\u{EDB1}';
@@ -63,7 +78,7 @@ pub mod nab {
     pub const CONSONANT_WA: char = '\u{EDBE}';
 
     //
-    // Spanish / foreign consonants
+    // Non-native consonants retained for loanwords
     //
     pub const CONSONANT_NYA: char = '\u{EDC0}';
     pub const CONSONANT_BVA: char = '\u{EDC1}';
