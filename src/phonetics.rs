@@ -1,3 +1,20 @@
+//! Morphophonemic (M) ↔ phonetic/allophonic (F) transformations.
+//!
+//! This module implements sound changes used when deriving
+//! phonetic spellings and pronunciations from morphophonemic
+//! ATOMIC forms.
+//!
+//! The transformations model common Nahuatl allophones such as:
+//!
+//! - /n/ -> [h] word-finally
+//! - /w/ -> [h] in syllable codas
+//! - /kʷ/ -> [h] before /k/
+//! - /k/ -> [h] before certain consonants
+//! - /ll/ -> [hl] in specific environments
+//!
+//! These rules are also used to construct phonetic IPA output
+//! and search forms.
+
 use crate::atomic::{is_atomic_consonant, is_atomic_vowel};
 use crate::orthography::atomic_to_ipa;
 use once_cell::sync::Lazy;
@@ -7,45 +24,32 @@ use regex::Regex;
 const CONSONANTS: &str = "mnptkκτλςsxhlwyñβdgfrρbv";
 const CONSONANTS_WITH_SPACE: &str = "mnptkκτλςsxhlwyñβdgfrρbv ";
 
-//
-// /ll/ -> [hl]
-//
-
 static LL2HL: Lazy<Regex> = Lazy::new(|| Regex::new(r"([i])l(l[ai])").unwrap());
 
+/// Applies the /ll/ → [hl] allophone rule in environments
+/// such as illia → ihlia.
 pub fn ll2hl(word: &str) -> String {
     LL2HL.replace(word, "${1}h${2}").into_owned()
 }
 
-//
-// terminal /n/ -> [h]
-//
-
 static N2H_FINAL: Lazy<Regex> = Lazy::new(|| Regex::new(r"n$").unwrap());
 
+/// Applies the common word-final /n/ → [h] allophone rule.
 pub fn n2h(word: &str) -> String {
     N2H_FINAL.replace(word, "h").into_owned()
 }
-
-//
-// /w/ coda -> [h]
-//
 
 static W2H: Lazy<Regex> =
     Lazy::new(|| Regex::new(&format!(r"([aeio])w([{CONSONANTS_WITH_SPACE}])")).unwrap());
 
 static W2H_FINAL: Lazy<Regex> = Lazy::new(|| Regex::new(r"([aeio])w$").unwrap());
 
+/// Applies the syllable-coda /w/ → [h] allophone rule.
 pub fn w2h(word: &str) -> String {
     let word = W2H.replace_all(word, "${1}h${2}");
     let word = W2H_FINAL.replace(&word, "${1}h");
     word.into_owned()
 }
-
-//
-// /kʷ/ coda -> [h] before k
-// /kʷ/ coda -> [k] elsewhere
-//
 
 static KW2H: Lazy<Regex> = Lazy::new(|| Regex::new(r"([aeio])κ(k)").unwrap());
 
@@ -54,6 +58,8 @@ static KW2K: Lazy<Regex> =
 
 static KW2K_FINAL: Lazy<Regex> = Lazy::new(|| Regex::new(r"([aeio])κ$").unwrap());
 
+/// Converts coda /kʷ/ to its phonetic realizations:
+/// [h] before /k/, [k] elsewhere.
 pub fn kw2k_or_h(word: &str) -> String {
     let word = KW2H.replace_all(word, "${1}h${2}");
     let word = KW2K.replace_all(&word, "${1}k${2}");
@@ -62,21 +68,20 @@ pub fn kw2k_or_h(word: &str) -> String {
     word.into_owned()
 }
 
-//
-// /k/ coda before consonant -> [h]
-//
-
 static KCONS2HCONS: Lazy<Regex> =
     Lazy::new(|| Regex::new(&format!(r"([aeio])k([{CONSONANTS}])([aeio])")).unwrap());
 
+/// Applies the /k/ → [h] coda-before-consonant allophone rule.
 pub fn k_cons_to_h_cons(word: &str) -> String {
     KCONS2HCONS.replace(word, "${1}h${2}${3}").into_owned()
 }
 
-//
-// Full M -> F pipeline
-//
-
+/// Applies the complete morphophonemic-to-phonetic (M→F)
+/// transformation pipeline.
+///
+/// The resulting form reflects common allophonic spellings
+/// used by phonetic orthographies such as SEP and forms the
+/// basis for phonetic IPA generation.
 pub fn apply_m2f(word: &str) -> String {
     let word = ll2hl(word);
     let word = n2h(&word);
@@ -86,6 +91,11 @@ pub fn apply_m2f(word: &str) -> String {
     k_cons_to_h_cons(&word)
 }
 
+/// Removes adjacent identical consonants.
+///
+/// This is primarily used when constructing search forms and
+/// phonetic orthographies that do not preserve geminate
+/// consonants.
 pub fn degeminate(word: &str) -> String {
     let mut out = String::new();
     let chars: Vec<char> = word.chars().collect();
@@ -104,6 +114,8 @@ pub fn degeminate(word: &str) -> String {
     out
 }
 
+/// Inserts syllable boundaries using a simple ATOMIC
+/// syllabification heuristic.
 pub fn syllabify(word: &str) -> String {
     let mut out = String::new();
     let chars: Vec<char> = word.chars().collect();
@@ -134,6 +146,8 @@ pub fn syllabify(word: &str) -> String {
     out
 }
 
+/// Marks penultimate stress using the IPA primary-stress
+/// symbol (ˈ).
 pub fn mark_penultimate_stress(s: &str) -> String {
     let mut positions = Vec::new();
 
@@ -157,8 +171,11 @@ pub fn mark_penultimate_stress(s: &str) -> String {
     }
 }
 
+/// Lexical exceptions to the default penultimate-stress rule.
 const STRESS_EXCEPTIONS: &[(&str, &str)] = &[("ˈaʃ·t͡ɬen", "aʃˈt͡ɬen"), ("ˈjon.se", "jonˈse")];
 
+/// Applies lexical corrections for words whose stress
+/// placement differs from the default penultimate pattern.
 pub fn fix_stress_exceptions(iph: &str) -> String {
     let mut res = iph.to_string();
     for (from, to) in STRESS_EXCEPTIONS {
@@ -167,6 +184,11 @@ pub fn fix_stress_exceptions(iph: &str) -> String {
     res
 }
 
+/// Produces a phonetic IPA transcription.
+///
+/// Unlike `atomic_to_ipa()`, this function first applies
+/// allophonic processing, syllabification, stress assignment,
+/// and stress-correction rules before generating IPA output.
 pub fn atomic_to_ipa_phonetic(word: &str) -> String {
     let degem = degeminate(word);
     let syllables = syllabify(&degem);
@@ -177,6 +199,11 @@ pub fn atomic_to_ipa_phonetic(word: &str) -> String {
     fix_stress_exceptions(&ipa)
 }
 
+/// Produces a simplified search form.
+///
+/// Search forms are derived by applying phonetic allophonic
+/// rules and removing geminated consonants so that common
+/// spelling variations remain searchable.
 pub fn search_form(word: &str) -> String {
     degeminate(&apply_m2f(word))
 }
