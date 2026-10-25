@@ -1,9 +1,24 @@
 use once_cell::sync::Lazy;
 use regex::Regex;
+use std::sync::OnceLock;
 
-use crate::en_endings::ends_in_en;
+fn en_endings() -> &'static [&'static str] {
+    static ENDINGS: OnceLock<Vec<&'static str>> = OnceLock::new();
+    ENDINGS.get_or_init(|| {
+        include_str!("data/en_endings.txt")
+            .lines()
+            .map(str::trim)
+            .filter(|s| !s.is_empty() && !s.starts_with('#'))
+            .collect()
+    })
+}
 
-// Prefixes participating in the hk(i|eh) -> wk(i|eh) alternation.
+pub fn ends_in_en(word: &str) -> bool {
+    en_endings().iter().any(|suffix| word.ends_with(suffix))
+}
+
+// Extracted prefixes for HK2WK regex
+// Note: If prefixes ever become dynamic, remember to use regex::escape.
 static HK2WK_PREFIXES: &[&str] = &[
     "ala",
     "kana",
