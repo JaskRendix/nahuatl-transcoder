@@ -1,3 +1,13 @@
+//! F→M (phonetic-to-morphophonemic) restoration rules.
+//!
+//! These transformations are used when converting text from
+//! phonetic orthographies (such as SEP-style spellings) back
+//! toward morphophonemic orthographies.
+//!
+//! The process is inherently heuristic and cannot perfectly
+//! reconstruct the original spelling because phonetic spellings
+//! often omit distinctions present in morphophonemic systems.
+
 use once_cell::sync::Lazy;
 use regex::Regex;
 use std::sync::OnceLock;
@@ -13,6 +23,8 @@ fn en_endings() -> &'static [&'static str] {
     })
 }
 
+/// Returns true if `word` ends with a suffix that historically
+/// surfaces as `-en` in morphophonemic orthographies.
 pub fn ends_in_en(word: &str) -> bool {
     en_endings().iter().any(|suffix| word.ends_with(suffix))
 }
@@ -72,6 +84,14 @@ static HK2WK: Lazy<Regex> = Lazy::new(|| {
     Regex::new(&pattern).unwrap()
 });
 
+/// Restores syllable-final /w/ that was realized as [h]
+/// in certain phonetic spellings.
+///
+/// Examples:
+///
+/// - pehki  -> pewki
+/// - pehkeh -> pewkeh
+/// - kohki  -> kowki
 pub fn hk2wk(word: &str) -> String {
     HK2WK.replace(word, "${1}wk${2}").into_owned()
 }
@@ -79,10 +99,15 @@ pub fn hk2wk(word: &str) -> String {
 static HCONS2KCONS: Lazy<Regex> =
     Lazy::new(|| Regex::new(r"([nt]i)h([mnptkκτλςsxhlwyñβdgfrρbv])([aeio])").unwrap());
 
+/// Converts certain consonantal [h] realizations back to
+/// morphophonemic /k/ based on known verbal patterns.
 pub fn h_cons_to_k_cons(word: &str) -> String {
     HCONS2KCONS.replace(word, "${1}k${2}${3}").into_owned()
 }
 
+/// Restores word-final /w/ for a small set of common words
+/// that are frequently written with final [h] in phonetic
+/// orthographies.
 pub fn h2w(word: &str) -> String {
     match word {
         "peτikih" => "peτikiw".to_string(),
@@ -97,8 +122,10 @@ const TZIH_EXCEPTIONS: &[&str] = &["τahτih", "weτih"];
 const SECIH_EXCEPTIONS: &[&str] = &["leςih", "peςih"];
 const LIH_EXCEPTIONS: &[&str] = &["kikilih"];
 
-// Order matters. Replacements are applied sequentially and later
-// rules operate on the result of earlier rules.
+// Explicit lexical corrections derived from NOCE.
+//
+// Ordering is significant because later replacements operate
+// on the results of earlier substitutions.
 const NOCE_REPLACEMENTS: &[(&str, &str)] = &[
     ("iniwah", "inihwan"),
     ("iniwantih", "inihwantin"),
@@ -116,6 +143,12 @@ fn apply_suffix_unless(w: &mut String, suffix: &str, replacement: &str, exceptio
     }
 }
 
+/// Restores word-final /n/ from phonetic spellings that
+/// surface final /n/ as [h], using a combination of suffix
+/// rules, exception lists, and lexical patterns.
+///
+/// This is an intentionally conservative heuristic intended
+/// to reduce false-positive conversions.
 pub fn h2n(word: &str) -> String {
     let mut w = word.to_string();
 
@@ -137,6 +170,11 @@ pub fn h2n(word: &str) -> String {
     w
 }
 
+/// Applies the complete phonetic-to-morphophonemic restoration
+/// pipeline.
+///
+/// Transformations are applied in the same order as the original
+/// Nahuatl Tools implementation.
 pub fn apply_f2m(word: &str) -> String {
     let word = hk2wk(word);
     let word = h_cons_to_k_cons(&word);
