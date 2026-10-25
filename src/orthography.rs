@@ -1,3 +1,16 @@
+//! Conversion from ATOMIC orthography to external orthographies
+//! and phonetic representations.
+//!
+//! This module provides exporters for:
+//!
+//! - SEP orthography
+//! - Hasler orthography
+//! - ACK orthography
+//! - IPA transcription
+//!
+//! Most conversions are simple character mappings, while
+//! ACK requires context-sensitive spelling rules.
+
 use crate::atomic::{is_atomic_letter, is_atomic_vowel};
 
 fn map_sep(ch: char) -> Option<&'static str> {
@@ -158,7 +171,10 @@ fn map_ipa(ch: char) -> Option<&'static str> {
     })
 }
 
-/// Helper to drive simple character-by-character mapping functions.
+/// Applies a character-mapping function to every character
+/// in the input string.
+///
+/// Characters without a mapping are copied unchanged.
 fn transliterate<F>(input: &str, map_fn: F) -> String
 where
     F: Fn(char) -> Option<&'static str>,
@@ -173,18 +189,32 @@ where
     out
 }
 
+/// Converts ATOMIC text to SEP orthography.
 pub fn atomic_to_sep(input: &str) -> String {
     transliterate(input, map_sep)
 }
 
+/// Converts ATOMIC text to Hasler orthography.
 pub fn atomic_to_hasler(input: &str) -> String {
     transliterate(input, map_hasler)
 }
 
+/// Converts ATOMIC text to IPA.
 pub fn atomic_to_ipa(input: &str) -> String {
     transliterate(input, map_ipa)
 }
 
+/// Converts ATOMIC text to ACK orthography.
+///
+/// Unlike the other exporters, ACK orthography requires
+/// context-sensitive spelling rules such as:
+///
+/// - w → hu / uh
+/// - κ → cu / uc
+/// - k → qu before e/i
+/// - k → c elsewhere
+/// - s → c before e/i
+/// - s → z elsewhere
 pub fn atomic_to_ack(input: &str) -> String {
     let chars: Vec<char> = input.chars().collect();
     let mut out = String::new();
