@@ -1,13 +1,42 @@
+//! MetaWord parsing and named-entity detection.
+//!
+//! This module splits input text into `MetaWord` records,
+//! preserving surrounding punctuation while normalizing words
+//! into the internal ATOMIC orthography.
+//!
+//! During parsing, words may be classified as:
+//!
+//! - proper names
+//! - place names
+//! - deity names
+//! - immutable words
+//!
+//! Classification can be driven by explicit tags or inferred
+//! from lexical data and orthographic heuristics.
+
 use crate::atomic::{is_foreign_consonant, to_atomic};
 
 use std::collections::HashSet;
 use std::sync::OnceLock;
 
+/// Explicit tag marking a proper name.
 pub const TAG_PROPER_NAME: char = '\u{200B}';
+
+/// Explicit tag marking a place name.
 pub const TAG_PLACE_NAME: char = '\u{200C}';
+
+/// Explicit tag marking a deity name.
 pub const TAG_DEITY_NAME: char = '\u{200D}';
+
+/// Explicit tag marking an immutable word.
 pub const TAG_IMMUTABLE: char = '\u{200E}';
 
+/// A parsed word together with normalization and
+/// classification metadata.
+///
+/// `MetaWord` preserves the original spelling while also
+/// storing a normalized ATOMIC representation used by
+/// orthographic conversion pipelines.
 #[derive(Debug, Clone, Default)]
 pub struct MetaWord {
     pub original: String,
@@ -31,6 +60,7 @@ const PREFIX_PUNCTUATION: &str =
 
 const POSTFIX_PUNCTUATION: &str = "\n\r.,—–‒/#!¡$%^&*;:=-_`~@+?¿(){}<>[]+\"“”«»‘’‛‹›…'";
 
+/// Loads a newline-delimited word list into a hash set.
 fn load_word_set(content: &'static str) -> HashSet<&'static str> {
     content
         .lines()
@@ -54,25 +84,33 @@ fn deities() -> &'static HashSet<&'static str> {
     DEITIES.get_or_init(|| load_word_set(include_str!("data/deities.txt")))
 }
 
+/// Returns true if `name` is listed as a given name.
 pub fn is_given_name(name: &str) -> bool {
     let name = name.to_lowercase();
     given_names().contains(name.as_str())
 }
 
+/// Returns true if `name` is listed as a family name.
 pub fn is_family_name(name: &str) -> bool {
     let name = name.to_lowercase();
     surnames().contains(name.as_str())
 }
 
+/// Returns true if `name` is recognized as a proper name.
 pub fn is_proper_name(name: &str) -> bool {
     let name = name.to_lowercase();
     given_names().contains(name.as_str()) || surnames().contains(name.as_str())
 }
 
+/// Returns true if `name` matches a known Nahuatl deity.
 pub fn is_deity(name: &str) -> bool {
     deities().contains(name)
 }
 
+/// Separates leading punctuation, the core word,
+/// and trailing punctuation.
+///
+/// Returns `(prefix, word, postfix)`.
 pub fn segregate_punctuation(input: &str) -> (String, String, String) {
     let chars: Vec<char> = input.chars().collect();
     let mut i = 0;
@@ -99,6 +137,11 @@ pub fn segregate_punctuation(input: &str) -> (String, String, String) {
     (prefix, word, postfix)
 }
 
+/// Heuristically identifies place names by testing for
+/// common Nahuatl locative suffixes.
+///
+/// Words containing foreign consonants are excluded from
+/// automatic place-name detection.
 pub fn has_locative_suffix(s: &str) -> bool {
     const SUFFIXES: &[&str] = &["ko", "λan", "tepek", "τinco", "singo", "apa", "apan", "kan"];
 
@@ -117,6 +160,17 @@ pub fn has_locative_suffix(s: &str) -> bool {
     true
 }
 
+/// Splits text into `MetaWord` records.
+///
+/// Each word is:
+///
+/// - separated from surrounding punctuation
+/// - normalized into ATOMIC orthography
+/// - checked for capitalization
+/// - classified as a proper name, place name, deity name,
+///   or immutable term
+///
+/// Explicit tags take precedence over heuristic detection.
 pub fn split_to_metawords(input: &str) -> Vec<MetaWord> {
     let mut result = Vec::new();
 
