@@ -1,33 +1,69 @@
+//! Nahuatl orthography normalization.
+//!
+//! This module converts a variety of colonial and modern Nahuatl
+//! orthographies into a common internal representation known as
+//! ATOMIC.
+//!
+//! ATOMIC replaces multigraphs with unique Unicode code points:
+//!
+//! - κ = /kʷ/
+//! - τ = /t͡s/
+//! - λ = /t͡ɬ/
+//! - ς = /t͡ʃ/
+//! - ρ = Spanish-style "rr"
+//!
+//! Using single code points simplifies mapping, phonological
+//! processing, syllabification, and conversion between
+//! orthographies.
+
 use crate::trager::trager_to_atomic;
 
+/// All vowels recognized by the ATOMIC orthography.
 pub const ATOMIC_VOWELS: &str = "aeioāēīōuū";
 
+/// All consonants recognized by the ATOMIC orthography.
 pub const ATOMIC_CONSONANTS: &str = "mnptkκτλςsxhlwyñβdgfrρbv";
 
+/// Consonants used primarily in Spanish loanwords.
 pub const FOREIGN_CONSONANTS: &str = "ñβdgfrρbv";
 
+/// Atomic representation of the Nahuatl /kʷ/ phoneme.
 pub const ATOMIC_KW: char = 'κ';
+
+/// Atomic representation of the Nahuatl /t͡s/ phoneme.
 pub const ATOMIC_TS: char = 'τ';
+
+/// Atomic representation of the Nahuatl /t͡ɬ/ phoneme.
 pub const ATOMIC_TL: char = 'λ';
+
+/// Atomic representation of the Nahuatl /t͡ʃ/ phoneme.
 pub const ATOMIC_CH: char = 'ς';
+
+/// Atomic representation of Spanish-style "rr".
 pub const ATOMIC_RR: char = 'ρ';
 
+/// Returns true if `ch` is an ATOMIC vowel.
 pub fn is_atomic_vowel(ch: char) -> bool {
     ATOMIC_VOWELS.contains(ch)
 }
 
+/// Returns true if `ch` is an ATOMIC consonant.
 pub fn is_atomic_consonant(ch: char) -> bool {
     ATOMIC_CONSONANTS.contains(ch)
 }
 
+/// Returns true if `ch` belongs to the ATOMIC alphabet.
 pub fn is_atomic_letter(ch: char) -> bool {
     is_atomic_vowel(ch) || is_atomic_consonant(ch)
 }
 
+/// Returns true if `ch` is a consonant used primarily in
+/// Spanish loanwords.
 pub fn is_foreign_consonant(ch: char) -> bool {
     FOREIGN_CONSONANTS.contains(ch)
 }
 
+/// Removes vowel-length marking from an ATOMIC vowel.
 pub fn to_unmarked_vowel(ch: char) -> char {
     match ch {
         'ā' => 'a',
@@ -39,6 +75,30 @@ pub fn to_unmarked_vowel(ch: char) -> char {
     }
 }
 
+/// Ordered replacements used when converting Latin-based
+/// orthographies into ATOMIC.
+///
+/// Ordering is semantically significant. Longer or more specific
+/// patterns must appear before shorter and more general patterns.
+///
+/// IMPORTANT:
+///
+/// Do not sort or reorder this table. Several mappings depend on
+/// earlier substitutions running before more general rules.
+///
+/// For example:
+///
+/// - "cu" -> "κ" must occur before
+/// - "c"  -> "k"
+///
+/// Likewise:
+///
+/// - "hu" -> "w"
+/// - "uh" -> "w"
+///
+/// must occur before the fallback SEP rule:
+///
+/// - "u" -> "w"
 const GENERAL_TO_ATOMIC: &[(&str, &str)] = &[
     // historical
     ("cuh", "κ"),
@@ -108,6 +168,22 @@ const GENERAL_TO_ATOMIC: &[(&str, &str)] = &[
     ("c", "k"),
 ];
 
+/// Converts a Nahuatl word from a supported orthography into
+/// the internal ATOMIC representation.
+///
+/// Supported input conventions include:
+///
+/// - Classical colonial spellings
+/// - ACK orthography
+/// - SEP orthography
+/// - Hasler-style modern orthography
+/// - Trager orthography
+///
+/// Note:
+///
+/// Conversion is intentionally lossy. Distinct source spellings may
+/// normalize to the same ATOMIC representation, and the original
+/// orthography cannot always be reconstructed from the result.
 pub fn to_atomic(input: &str) -> String {
     if input.is_empty() {
         return String::new();
