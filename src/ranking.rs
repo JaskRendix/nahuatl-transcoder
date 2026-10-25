@@ -386,12 +386,12 @@ pub fn compare_prepared_rankers(
         });
     }
 
-    let selections = [
+    let ablation_definitions = [
         ("heuristic_only", RankerSelection::HeuristicOnly),
         ("lexical_prior_only", RankerSelection::LexicalOnly),
         ("combined", RankerSelection::Combined),
     ];
-    let ablations = selections
+    let ablations = ablation_definitions
         .into_iter()
         .map(|(name, selection)| {
             let ranked_examples = prepared
