@@ -1,3 +1,12 @@
+//! Candidate ranking, lexical priors, and evaluation utilities.
+//!
+//! This module ranks reconstructed morphophonemic candidates
+//! using heuristic scores, lexical attestation data, or
+//! combinations of both.
+//!
+//! It also provides benchmarking, ablation experiments, and
+//! report generation for comparing ranking strategies.
+
 use std::collections::{BTreeMap, HashSet};
 use std::path::Path;
 
@@ -10,6 +19,8 @@ use crate::evaluation::report::BenchmarkMetadata;
 use crate::reconstruction::Candidate;
 use crate::{convert_all, evaluation::ValidatedCorpus};
 
+/// Features extracted from a reconstructed candidate that
+/// may be used during ranking.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct CandidateFeatures {
     pub lexical_attestation: bool,
@@ -19,6 +30,7 @@ pub struct CandidateFeatures {
     pub heuristic_score: i32,
 }
 
+/// A candidate together with ranking features and scores.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct RankedCandidate {
     pub atomic: String,
@@ -30,6 +42,7 @@ pub struct RankedCandidate {
     pub final_rank: usize,
 }
 
+/// Ranking strategy used when ordering candidates.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum RankerSelection {
@@ -40,6 +53,8 @@ pub enum RankerSelection {
     Combined,
 }
 
+/// Lexical resource used to provide attestation-based
+/// ranking signals.
 #[derive(Debug, Clone, Default)]
 pub struct LexicalInventory {
     exact_atomic: HashSet<String>,
@@ -47,6 +62,7 @@ pub struct LexicalInventory {
 }
 
 impl LexicalInventory {
+    /// Builds a lexical inventory from ATOMIC forms.
     pub fn from_atomic_forms(forms: impl IntoIterator<Item = String>) -> Self {
         let exact_atomic: HashSet<String> = forms.into_iter().collect();
         let normalized_atomic = exact_atomic.iter().map(|form| to_atomic(form)).collect();
@@ -56,6 +72,8 @@ impl LexicalInventory {
         }
     }
 
+    /// Builds a lexical inventory from dictionary headwords,
+    /// normalizing them to ATOMIC orthography.
     pub fn from_headwords(headwords: impl IntoIterator<Item = String>) -> Self {
         let exact_atomic: Vec<String> = headwords
             .into_iter()
@@ -64,10 +82,12 @@ impl LexicalInventory {
         Self::from_atomic_forms(exact_atomic)
     }
 
+    /// Loads a lexical inventory from a G2 lexicon file.
     pub fn load_g2(path: impl AsRef<Path>) -> Result<Self, std::io::Error> {
         Self::from_g2_bytes(&std::fs::read(path)?)
     }
 
+    /// Loads a lexical inventory from G2-formatted content.
     pub fn from_g2_bytes(contents: &[u8]) -> Result<Self, std::io::Error> {
         let contents = std::str::from_utf8(contents)
             .map_err(|error| std::io::Error::new(std::io::ErrorKind::InvalidData, error))?;
@@ -106,10 +126,12 @@ impl LexicalInventory {
     }
 }
 
+/// Orders candidates according to a ranking strategy.
 pub trait Ranker {
     fn rank(&self, candidates: &[Candidate], inventory: &LexicalInventory) -> Vec<RankedCandidate>;
 }
 
+/// Ranker that uses heuristic reconstruction scores only.
 #[derive(Debug, Clone, Copy, Default)]
 pub struct BaselineRanker;
 
@@ -119,6 +141,8 @@ impl Ranker for BaselineRanker {
     }
 }
 
+/// Ranker that combines lexical attestation with heuristic
+/// reconstruction scores.
 #[derive(Debug, Clone, Copy, Default)]
 pub struct LexicalPriorRanker;
 
@@ -128,12 +152,14 @@ impl Ranker for LexicalPriorRanker {
     }
 }
 
+/// Evaluation results for a ranking strategy.
 #[derive(Debug, Clone, PartialEq)]
 pub struct RankerEvaluation {
     pub metrics: MetricSummary,
     pub ranked_candidates: Vec<Vec<RankedCandidate>>,
 }
 
+/// Evaluates a ranker against a prepared benchmark corpus.
 pub fn evaluate_ranker(
     prepared: &PreparedBenchmark,
     inventory: &LexicalInventory,
@@ -165,12 +191,15 @@ pub fn evaluate_ranker(
     }
 }
 
+/// Metrics for a single ranking ablation experiment.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct AblationResult {
     pub name: String,
     pub metrics: MetricSummary,
 }
 
+/// Comparative report covering multiple ranking strategies,
+/// benchmark metrics, and candidate-level rankings.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct RecordRankingComparison {
     pub record_id: String,
@@ -213,6 +242,11 @@ pub struct RankingComparisonReport {
     pub side_by_side: Vec<RecordRankingComparison>,
 }
 
+/// Ranks candidates using the selected strategy.
+///
+/// Depending on the chosen ranking mode, ordering may be
+/// based on heuristic scores, lexical evidence, or a
+/// combination of both.
 pub fn rank_with(
     candidates: &[Candidate],
     inventory: &LexicalInventory,
@@ -282,10 +316,15 @@ pub fn rank_with(
         .collect()
 }
 
+/// Combines lexical and heuristic scores into a single value.
+///
+/// Lexical evidence is weighted more heavily than heuristic
+/// preferences.
 fn combined_score(lexical_score: i32, heuristic_score: i32) -> i32 {
     lexical_score * 100 + heuristic_score
 }
 
+/// Runs ranking comparisons on a validated corpus.
 pub fn compare_corpus_rankers(
     corpus: &ValidatedCorpus,
     inventory: &LexicalInventory,
@@ -294,6 +333,7 @@ pub fn compare_corpus_rankers(
     compare_corpus_rankers_with_selection(corpus, inventory, top_k, RankerSelection::Combined)
 }
 
+/// Runs ranking comparisons using a specific ranking strategy.
 pub fn compare_corpus_rankers_with_selection(
     corpus: &ValidatedCorpus,
     inventory: &LexicalInventory,
@@ -304,6 +344,7 @@ pub fn compare_corpus_rankers_with_selection(
     compare_prepared_rankers(&prepared, inventory, top_k, selected_ranker)
 }
 
+/// Compares ranking strategies using a prepared benchmark.
 pub fn compare_prepared_rankers(
     prepared: &PreparedBenchmark,
     inventory: &LexicalInventory,
@@ -434,6 +475,7 @@ pub fn compare_prepared_rankers(
     }
 }
 
+/// Builds a lookup table from candidate form to ranked entry.
 fn ranks(candidates: &[RankedCandidate]) -> BTreeMap<String, &RankedCandidate> {
     candidates
         .iter()
@@ -442,6 +484,7 @@ fn ranks(candidates: &[RankedCandidate]) -> BTreeMap<String, &RankedCandidate> {
 }
 
 impl RankingComparisonReport {
+    /// Renders the comparison report as a Markdown document.
     pub fn to_markdown(&self) -> String {
         let mut output = format!(
             "# Lexical-prior ranking experiment\n\n\
