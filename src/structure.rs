@@ -1,5 +1,7 @@
 use crate::constants::*;
 
+const VUV_PATTERN_LENGTH: usize = 3;
+
 fn is_consonant(ch: char) -> bool {
     matches!(
         ch,
@@ -73,13 +75,11 @@ pub fn structure(input: &str) -> String {
     // Phase Zero:
     // V U V -> V WA V
     //
-    for i in 0..elem.len() {
-        let first = elem.get(i).copied().unwrap_or('\0');
-        let second = elem.get(i + 1).copied().unwrap_or('\0');
-        let third = elem.get(i + 2).copied().unwrap_or('\0');
-
-        if is_vowel(first) && is_vowel_u(second) && is_vowel(third) {
-            elem[i + 1] = CONSONANT_WA;
+    if elem.len() >= VUV_PATTERN_LENGTH {
+        for i in 0..=elem.len() - VUV_PATTERN_LENGTH {
+            if is_vowel(elem[i]) && is_vowel_u(elem[i + 1]) && is_vowel(elem[i + 2]) {
+                elem[i + 1] = CONSONANT_WA;
+            }
         }
     }
 
