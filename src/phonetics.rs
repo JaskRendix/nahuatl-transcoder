@@ -3,6 +3,10 @@ use crate::orthography::atomic_to_ipa;
 use once_cell::sync::Lazy;
 use regex::Regex;
 
+// Shared consonant inventory for regex character classes
+const CONSONANTS: &str = "mnptkκτλςsxhlwyñβdgfrρbv";
+const CONSONANTS_WITH_SPACE: &str = "mnptkκτλςsxhlwyñβdgfrρbv ";
+
 //
 // /ll/ -> [hl]
 //
@@ -28,7 +32,7 @@ pub fn n2h(word: &str) -> String {
 //
 
 static W2H: Lazy<Regex> =
-    Lazy::new(|| Regex::new(r"([aeio])w([mnptkκτλςsxhlwyñβdgfrρbv ])").unwrap());
+    Lazy::new(|| Regex::new(&format!(r"([aeio])w([{CONSONANTS_WITH_SPACE}])")).unwrap());
 
 static W2H_FINAL: Lazy<Regex> = Lazy::new(|| Regex::new(r"([aeio])w$").unwrap());
 
@@ -46,7 +50,7 @@ pub fn w2h(word: &str) -> String {
 static KW2H: Lazy<Regex> = Lazy::new(|| Regex::new(r"([aeio])κ(k)").unwrap());
 
 static KW2K: Lazy<Regex> =
-    Lazy::new(|| Regex::new(r"([aeio])κ([mnptκτλςsxhlwyñβdgfrρbv ])").unwrap());
+    Lazy::new(|| Regex::new(&format!(r"([aeio])κ([{CONSONANTS_WITH_SPACE}])")).unwrap());
 
 static KW2K_FINAL: Lazy<Regex> = Lazy::new(|| Regex::new(r"([aeio])κ$").unwrap());
 
@@ -63,7 +67,7 @@ pub fn kw2k_or_h(word: &str) -> String {
 //
 
 static KCONS2HCONS: Lazy<Regex> =
-    Lazy::new(|| Regex::new(r"([aeio])k([mnptkκτλςsxhlwyñβdgfrρbv])([aeio])").unwrap());
+    Lazy::new(|| Regex::new(&format!(r"([aeio])k([{CONSONANTS}])([aeio])")).unwrap());
 
 pub fn k_cons_to_h_cons(word: &str) -> String {
     KCONS2HCONS.replace(word, "${1}h${2}${3}").into_owned()
@@ -153,9 +157,14 @@ pub fn mark_penultimate_stress(s: &str) -> String {
     }
 }
 
+const STRESS_EXCEPTIONS: &[(&str, &str)] = &[("ˈaʃ·t͡ɬen", "aʃˈt͡ɬen"), ("ˈjon.se", "jonˈse")];
+
 pub fn fix_stress_exceptions(iph: &str) -> String {
-    iph.replace("ˈaʃ·t͡ɬen", "aʃˈt͡ɬen")
-        .replace("ˈjon.se", "jonˈse")
+    let mut res = iph.to_string();
+    for (from, to) in STRESS_EXCEPTIONS {
+        res = res.replace(from, to);
+    }
+    res
 }
 
 pub fn atomic_to_ipa_phonetic(word: &str) -> String {
