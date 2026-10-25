@@ -1,83 +1,16 @@
-pub static EN_ENDINGS: &[&str] = &[
-    "amatomih",
-    "asadoh",
-    "bofotoh",
-    "bohbotoh",
-    "botoh",
-    "kakaρoh",
-    "kafeh",
-    "kahoh",
-    "kamioh",
-    "kapoh",
-    "kartoh",
-    "kaxtihlah",
-    "kaskaroh",
-    "seh",
-    "ςaςaρoh",
-    "ςitoh",
-    "simaρoh",
-    "sinκeκeskoh",
-    "kolςoh",
-    "komoh",
-    "konekafeh",
-    "κakafeh",
-    "κakahoh",
-    "κatemeτoh",
-    "ebofotoh",
-    "ebohbotoh",
-    "elkotoh",
-    "waxih",
-    "ilimoh",
-    "ilimonτalah",
-    "itoh",
-    "ihkaτah",
-    "ixwakeh",
-    "listoh",
-    "maweτkah",
-    "maweτiyah",
-    "mah",
-    "meloh",
-    "miakih",
-    "mistoh",
-    "montoh",
-    "pantaloh",
-    "piςitoh",
-    "pih",
-    "pioh",
-    "pipilwah",
-    "pompoh",
-    "proweh",
-    "keςkotoh",
-    "kemah",
-    "kenihkaτah",
-    "talaςiyah",
-    "tehpih",
-    "tewah",
-    "tenah",
-    "λaκabohbotoh",
-    "λanκabohbotoh",
-    "toςoh",
-    "tohtoloh",
-    "toweinanah",
-    "tolipah",
-    "tomih",
-    "tonanah",
-    "totopoh",
-    "troh",
-    "τah",
-    "τitoh",
-    "τonkotoh",
-    "xantoloh",
-    "xexeκeh",
-    "xiwah",
-    "xihtenah",
-    "xixiκih",
-    "sahwah",
-    "saloh",
-    "sarteh",
-    "soh",
-];
+use std::sync::OnceLock;
+
+fn en_endings() -> &'static [&'static str] {
+    static ENDINGS: OnceLock<Vec<&'static str>> = OnceLock::new();
+    ENDINGS.get_or_init(|| {
+        include_str!("data/en_endings.txt")
+            .lines()
+            .map(str::trim)
+            .filter(|s| !s.is_empty() && !s.starts_with('#'))
+            .collect()
+    })
+}
 
 pub fn ends_in_en(word: &str) -> bool {
-    EN_ENDINGS.iter().any(|suffix| word.ends_with(suffix))
+    en_endings().iter().any(|suffix| word.ends_with(suffix))
 }
