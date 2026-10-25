@@ -1,9 +1,19 @@
+//! Reconstruction of morphophonemic candidates from SEP-style
+//! phonetic spellings.
+//!
+//! Because phonetic orthographies collapse distinctions present
+//! in morphophonemic systems, reconstruction is inherently
+//! ambiguous. This module generates and ranks candidate
+//! morphophonemic forms by applying a collection of reverse
+//! transformation heuristics.
+
 use crate::atomic::{is_atomic_consonant, is_atomic_vowel, to_atomic};
 use crate::geminate::geminate;
 use crate::orthography::atomic_to_ack;
 use crate::phonetics::degeminate;
 use crate::{apply_f2m, apply_m2f};
 
+/// Records the transformation path used to generate a candidate.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Derivation {
     Unchanged,
@@ -19,14 +29,24 @@ pub enum Derivation {
     GeminationThenFToM,
 }
 
+/// A reconstructed morphophonemic candidate.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Candidate {
+    /// Candidate form in ATOMIC orthography.
     pub atomic: String,
+
+    /// Candidate rendered in ACK orthography.
     pub ack: String,
+
+    /// Transformations that produced this candidate.
     pub derivations: Vec<Derivation>,
 }
 
 impl Candidate {
+    /// Assigns a heuristic confidence score.
+    ///
+    /// Higher scores represent analyses that require fewer
+    /// reconstruction assumptions.
     pub fn score(&self) -> i32 {
         let mut score = 0;
 
@@ -54,6 +74,8 @@ impl Candidate {
     }
 }
 
+/// Indicates whether reconstruction produced zero, one,
+/// or multiple valid candidates.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum CandidateStatus {
     NoCandidates,
@@ -61,16 +83,27 @@ pub enum CandidateStatus {
     Ambiguous,
 }
 
+/// Collection of reconstruction candidates together with
+/// ambiguity information.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CandidateSet {
+    /// Reconstructed candidates ordered by score.
     pub candidates: Vec<Candidate>,
+
+    /// Whether reconstruction was unique or ambiguous.
     pub status: CandidateStatus,
 }
 
+/// Returns true if a forward projection reproduces the
+/// observed form, allowing for gemination differences.
 fn projections_match(projected: &str, observed: &str) -> bool {
     projected == observed || degeminate(projected) == degeminate(observed)
 }
 
+/// Adds a candidate if it projects back to the observed form.
+///
+/// Duplicate candidates are merged and their derivation paths
+/// are accumulated.
 fn add_candidate(
     candidates: &mut Vec<Candidate>,
     atomic: String,
@@ -98,6 +131,13 @@ fn add_candidate(
     });
 }
 
+/// Reconstructs possible morphophonemic analyses from a
+/// SEP-style spelling.
+///
+/// Multiple candidate forms may be returned because distinct
+/// morphophonemic words can project to the same phonetic form.
+///
+/// Candidates are ranked using heuristic confidence scores.
 pub fn reconstruct_sep(input: &str) -> CandidateSet {
     let observed = to_atomic(input);
     let mut candidates = Vec::new();
@@ -259,6 +299,7 @@ pub fn reconstruct_sep(input: &str) -> CandidateSet {
     CandidateSet { candidates, status }
 }
 
+/// Recovers possible syllable-coda /w/ values realized as [h].
 fn recover_coda_w(observed: &str) -> Vec<String> {
     let chars: Vec<char> = observed.chars().collect();
 
@@ -299,6 +340,7 @@ fn recover_coda_w(observed: &str) -> Vec<String> {
     results
 }
 
+/// Recovers word-final /w/ values realized as final [h].
 fn recover_final_w(observed: &str) -> Option<String> {
     let chars: Vec<char> = observed.chars().collect();
 
@@ -313,6 +355,7 @@ fn recover_final_w(observed: &str) -> Option<String> {
     }
 }
 
+/// Recovers /k/ in contexts where it lenited to [h].
 fn recover_k_lenition(observed: &str) -> Vec<String> {
     let chars: Vec<char> = observed.chars().collect();
 
@@ -338,6 +381,7 @@ fn recover_k_lenition(observed: &str) -> Vec<String> {
         .collect()
 }
 
+/// Recovers coda /kʷ/ from its phonetic realizations.
 fn recover_kw(observed: &str) -> Vec<String> {
     let chars: Vec<char> = observed.chars().collect();
 
@@ -367,6 +411,7 @@ fn recover_kw(observed: &str) -> Vec<String> {
         .collect()
 }
 
+/// Recovers /ll/ from [hl] allophonic spellings.
 fn recover_ll_from_hl(observed: &str) -> Vec<String> {
     let chars: Vec<char> = observed.chars().collect();
 
