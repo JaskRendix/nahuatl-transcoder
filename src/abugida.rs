@@ -1,5 +1,14 @@
+//! Conversion from ATOMIC orthography to the Nahuatl abugida.
+//!
+//! Each ATOMIC letter is mapped directly to its corresponding
+//! abugida symbol. Long vowels are represented as a vowel
+//! character followed by the dedicated length marker.
+
 use crate::constants::*;
 
+/// Converts ATOMIC text into the Nahuatl abugida.
+///
+/// Unknown characters are passed through unchanged.
 pub fn atomic_to_abugida(input: &str) -> String {
     let mut out = String::with_capacity(input.len());
 
