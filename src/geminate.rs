@@ -1,3 +1,4 @@
+use once_cell::sync::Lazy;
 use regex::Regex;
 
 struct GemRule {
@@ -6,7 +7,13 @@ struct GemRule {
     exclude: Option<&'static str>,
 }
 
-static RULES: &[GemRule] = &[
+struct CompiledGemRule {
+    pattern: Regex,
+    replacement: &'static str,
+    exclude: Option<Regex>,
+}
+
+const RAW_RULES: &[GemRule] = &[
     // M
     GemRule {
         pattern: r"^kema[hn]?$",
@@ -123,21 +130,33 @@ static RULES: &[GemRule] = &[
     },
 ];
 
+static RULES: Lazy<Vec<CompiledGemRule>> = Lazy::new(|| {
+    RAW_RULES
+        .iter()
+        .map(|rule| CompiledGemRule {
+            pattern: Regex::new(rule.pattern).unwrap(),
+            replacement: rule.replacement,
+            exclude: rule.exclude.map(|ex| Regex::new(ex).unwrap()),
+        })
+        .collect()
+});
+
 pub fn geminate(input: &str) -> String {
     let mut result = input.to_string();
 
-    for rule in RULES {
-        if let Some(exclude) = rule.exclude {
-            let exclude = Regex::new(exclude).unwrap();
-
-            if exclude.is_match(&result) {
-                continue;
-            }
+    for rule in &*RULES {
+        if rule
+            .exclude
+            .as_ref()
+            .is_some_and(|exclude| exclude.is_match(&result))
+        {
+            continue;
         }
 
-        let pattern = Regex::new(rule.pattern).unwrap();
-
-        result = pattern.replace_all(&result, rule.replacement).into_owned();
+        result = rule
+            .pattern
+            .replace_all(&result, rule.replacement)
+            .into_owned();
     }
 
     result
