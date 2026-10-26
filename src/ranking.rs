@@ -10,8 +10,8 @@ use std::path::Path;
 use serde::{Deserialize, Serialize};
 
 use crate::atomic::to_atomic;
-use crate::reconstruction::Candidate;
 use crate::convert_all;
+use crate::reconstruction::Candidate;
 
 /// Features extracted from a reconstructed candidate that
 /// may be used during ranking.
@@ -223,7 +223,9 @@ fn combined_score(lexical_score: i32, heuristic_score: i32) -> i32 {
 
 #[cfg(test)]
 mod tests {
-    use super::{BaselineRanker, LexicalInventory, LexicalPriorRanker, Ranker, RankerSelection, rank_with};
+    use super::{
+        BaselineRanker, LexicalInventory, LexicalPriorRanker, Ranker, RankerSelection, rank_with,
+    };
     use crate::reconstruction::{Candidate, Derivation};
 
     fn candidate(atomic: &str, derivations: Vec<Derivation>) -> Candidate {
